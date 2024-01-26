@@ -1,0 +1,26 @@
+[package]
+name = "loon"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+#base64 = "0.21.7"
+bitcoincore-rpc = "0.17"
+clap = { version = "4.4.8", features = ["derive"] }
+nostr-sdk = { version = "0.27" }
+#serde = { version = "1.0", features = ["derive"] }
+rusqlite = "0.30"
+tokio = { version = "1", features = ["full"] }
+
+[dependencies.bdk]
+git = "https://github.com/bitcoindevkit/bdk"
+rev = "9efaead8f16a5a0bed18cea514cd94d6a9a0a582"
+version = "1.0.0-alpha.3"
+
+[dependencies.bdk_file_store]
+git = "https://github.com/bitcoindevkit/bdk"
+rev = "9efaead8f16a5a0bed18cea514cd94d6a9a0a582"
+#version = "0.3.0"

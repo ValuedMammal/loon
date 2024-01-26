@@ -1,0 +1,10 @@
+# rust
+/target
+Cargo.lock
+
+# dev notes
+notes.md
+
+# database
+*.db
+*.sql

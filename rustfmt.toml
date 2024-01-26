@@ -1,0 +1,4 @@
+# `cargo fmt`
+#comment_width = 100
+#group_imports = StdExternalCrate
+reorder_imports = false
