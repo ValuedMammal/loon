@@ -1,7 +1,11 @@
 [package]
 name = "loon"
 version = "0.1.0"
+authors = ["ValuedMammal <valuedmammal@protonmail.com>"]
 edition = "2021"
+description = "Loon wallet + multisig coordinator"
+repository = "https://github.com/ValuedMammal/loon"
+keywords = ["bitcoin", "nostr"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
