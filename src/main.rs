@@ -85,7 +85,6 @@ async fn main() -> cmd::Result<()> {
     match args.cmd {
         Cmd::Desc(subcmd) => cmd::descriptor::execute(coordinator, subcmd)?,
         Cmd::Call(param) => cmd::call::post(coordinator, param).await?,
-        //Cmd::Fetch => cmd::call::fetch(coordinator).await?,
         Cmd::Fetch => cmd::call::fetch_and_decrypt(coordinator).await?,
         Cmd::Wallet(subcmd) => cmd::wallet::execute(coordinator, subcmd)?,
     }

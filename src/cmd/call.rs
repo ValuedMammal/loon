@@ -41,9 +41,9 @@ pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
     // parse params into a payload
     let payload = {
         if nack {
-            CallTy::Nack.to_string()
+            CallTy::Nack.id().to_string()
         } else if ack {
-            CallTy::Ack.to_string()
+            CallTy::Ack.id().to_string()
         } else {
             // text note
             let Some(note) = note else {
@@ -86,28 +86,6 @@ pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
 }
 
 /// Fetch events from quorum participants.
-#[allow(dead_code)]
-pub async fn fetch(coordinator: Coordinator<'_>) -> Result<()> {
-    let client = coordinator.messenger().unwrap();
-    client.connect().await;
-
-    let subs = Filter::new()
-        .authors(coordinator.participants().map(|(_id, p)| p.pk))
-        .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
-    let events = client
-        .get_events_of(vec![subs], Some(super::TIMEOUT))
-        .await?;
-    for event in events {
-        if matches!(event.kind, Kind::TextNote) {
-            println!("{}", event.content);
-        }
-    }
-
-    Ok(())
-}
-
-/// Fetch events from quorum participants.
-#[allow(dead_code)]
 pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
     let client = coordinator.messenger().unwrap();
     let k = match client.signer().await? {
@@ -159,19 +137,49 @@ pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
                 .find(|(pid, _p)| pid.as_u32() == quid);
 
             if let Some((_pid, p)) = p {
+                // proceed if we are the intended recipient
                 if p.pk == k.public_key() {
                     assert!(message.len() > 15);
                     let payload = &message[15..];
-                    // reconstruct the conversation key
-                    // `nip44::v2::decrypt` requires that we base64 decode the payload
-                    //let conv = nip44::v2::ConversationKey::derive(&my_sec, &pk);
-                    //let data: Vec<u8> = general_purpose::STANDARD.decode(payload)?;
-                    //let res = nip44::v2::decrypt(&conv, data)?;
-                    // alternatively,
-                    let res = nip44::decrypt(&my_sec, &pk, payload)?;
+                    let res = match payload {
+                        "0" => CallTy::Nack,
+                        "1" => CallTy::Ack,
+                        _ => {
+                            // reconstruct the conversation key
+                            // `nip44::v2::decrypt` requires that we base64 decode the payload
+                            //let conv = nip44::v2::ConversationKey::derive(&my_sec, &pk);
+                            //let data: Vec<u8> = general_purpose::STANDARD.decode(payload)?;
+                            //let res = nip44::v2::decrypt(&conv, data)?;
+                            // alternatively,
+                            let m = nip44::decrypt(&my_sec, &pk, payload)?;
+                            CallTy::Note(m)
+                        }
+                    };
+
                     println!("{}", res);
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Fetch events from quorum participants.
+#[allow(dead_code)]
+pub async fn fetch(coordinator: Coordinator<'_>) -> Result<()> {
+    let client = coordinator.messenger().unwrap();
+    client.connect().await;
+
+    let subs = Filter::new()
+        .authors(coordinator.participants().map(|(_id, p)| p.pk))
+        .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
+    let events = client
+        .get_events_of(vec![subs], Some(super::TIMEOUT))
+        .await?;
+    for event in events {
+        if matches!(event.kind, Kind::TextNote) {
+            println!("{}", event.content);
         }
     }
 

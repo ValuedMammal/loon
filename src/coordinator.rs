@@ -171,19 +171,30 @@ pub enum CallTy {
     Note(String),
 }
 
-impl AsRef<u8> for CallTy {
-    fn as_ref(&self) -> &u8 {
+impl CallTy {
+    /// The numeric id of self.
+    pub fn id(&self) -> u8 {
         match self {
-            Self::Nack => &0,
-            Self::Ack => &1,
-            Self::Note(_) => &2,
+            Self::Nack => 0,
+            Self::Ack => 1,
+            Self::Note(_) => 2,
+        }
+    }
+}
+
+impl AsRef<str> for CallTy {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Nack => "Nack",
+            Self::Ack => "Ack",
+            Self::Note(m) => m.as_str(),
         }
     }
 }
 
 impl fmt::Display for CallTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", *self.as_ref())
+        write!(f, "{}", self.as_ref())
     }
 }
 
