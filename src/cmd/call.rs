@@ -13,7 +13,6 @@ const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
 /// Post a nostr note.
 pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
-    // Get the recipient
     let CallOpt {
         recipient,
         encrypt,
@@ -23,6 +22,7 @@ pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
         ..
     } = params;
 
+    // Get the recipient
     let Recipient { id, alias } = recipient;
     if let (None, None) = (id, alias.as_ref()) {
         bail!("no recipient found")
@@ -46,8 +46,9 @@ pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
             CallTy::Ack.id().to_string()
         } else {
             // text note
-            let Some(note) = note else {
-                bail!("no message provided");
+            let note = match note {
+                Some(n) if !n.trim().is_empty() => n,
+                _ => bail!("no message provided"),
             };
             if encrypt {
                 // nip44 encrypt
