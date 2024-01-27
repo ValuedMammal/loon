@@ -1,7 +1,7 @@
 use clap::Parser;
 use clap::Subcommand;
 
-/// Loon - Coordination at a distance
+/// Loon - Coordination at a distance.
 #[derive(Parser)]
 #[clap(author, about)]
 pub struct Args {
@@ -14,16 +14,22 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Send message
+    /// Push a private note to a quorum participant.
     Call(CallOpt),
-    /// Descriptors operations
+    /// Descriptors operations.
     #[clap(subcommand)]
     Desc(DescSubCmd),
-    /// Fetch notes from quorum participants
+    /// Fetch notes from quorum participants.
     Fetch,
-    // Periodically fetch notes in a background thread
+    // Periodically fetch notes in a background thread.
     //Listen,
-    /// Wallet operations
+    /// Push a plain text note.
+    Push {
+        /// Text
+        #[clap(required = true)]
+        note: String,
+    },
+    /// Wallet operations.
     #[clap(subcommand)]
     Wallet(WalletSubCmd),
 }
@@ -32,9 +38,6 @@ pub enum Cmd {
 pub struct CallOpt {
     #[clap(flatten)]
     pub recipient: Recipient,
-    /// Encrypts the note via NIP44 before sending
-    #[clap(long, short = 'e')]
-    pub encrypt: bool,
     /// Text
     #[clap(long, short = 'm')]
     pub note: Option<String>,
@@ -89,7 +92,7 @@ pub enum AddressSubCmd {
     /// Peek at a given index
     Peek {
         /// Address index
-        #[clap(required(true))]
+        #[clap(required = true)]
         index: u32,
     },
 }

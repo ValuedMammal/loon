@@ -11,11 +11,10 @@ use crate::cli::Recipient;
 /// How far to look back in time when polling the relay, currently one fortnight.
 const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
-/// Post a nostr note.
-pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
+/// Push an encrypted payload to a desginated recipient.
+pub async fn push_with_options(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
     let CallOpt {
         recipient,
-        encrypt,
         note,
         ack,
         nack,
@@ -50,24 +49,20 @@ pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
                 Some(n) if !n.trim().is_empty() => n,
                 _ => bail!("no message provided"),
             };
-            if encrypt {
-                // nip44 encrypt
-                let signer = coordinator
-                    .messenger()
-                    .expect("msg client must be init")
-                    .signer()
-                    .await?;
-                let my_sec = match signer {
-                    ClientSigner::Keys(k) => k.secret_key()?,
-                    _ => panic!("only keys signers allowed"),
-                };
 
-                let conversation_key = nip44::v2::ConversationKey::derive(&my_sec, &p.pk);
-                nip44::v2::encrypt(&conversation_key, note)?
-            } else {
-                // plain text
-                note
-            }
+            // nip44 encrypt
+            let signer = coordinator
+                .messenger()
+                .expect("msg client must be init")
+                .signer()
+                .await?;
+            let my_sec = match signer {
+                ClientSigner::Keys(k) => k.secret_key()?,
+                _ => panic!("only keys signers allowed"),
+            };
+
+            let conversation_key = nip44::v2::ConversationKey::derive(&my_sec, &p.pk);
+            nip44::v2::encrypt(&conversation_key, note)?
         }
     };
 
@@ -83,6 +78,15 @@ pub async fn post(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
         println!("Sent: {}", event_id);
     }
 
+    Ok(())
+}
+
+/// Push a plain text note.
+pub async fn push(coordinator: Coordinator<'_>, note: &str) -> Result<()> {
+    let client = coordinator.messenger().expect("must have msg client");
+    client.connect().await;
+    let event_id = client.publish_text_note(note, None).await?;
+    println!("Sent: {}", event_id);
     Ok(())
 }
 
