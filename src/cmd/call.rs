@@ -1,7 +1,7 @@
 use loon::CallTy;
 use loon::Coordinator;
 
-use super::nostr::{ClientSigner, Filter, Kind, Timestamp, XOnlyPublicKey};
+use super::nostr::{Filter, Kind, Timestamp, XOnlyPublicKey};
 use super::nostr::nip44;
 use super::Result;
 use super::bail;
@@ -51,16 +51,7 @@ pub async fn push_with_options(coordinator: Coordinator<'_>, params: CallOpt) ->
             };
 
             // nip44 encrypt
-            let signer = coordinator
-                .messenger()
-                .expect("msg client must be init")
-                .signer()
-                .await?;
-            let my_sec = match signer {
-                ClientSigner::Keys(k) => k.secret_key()?,
-                _ => panic!("only keys signers allowed"),
-            };
-
+            let my_sec = coordinator.keys().await?.secret_key()?;
             let conversation_key = nip44::v2::ConversationKey::derive(&my_sec, &p.pk);
             nip44::v2::encrypt(&conversation_key, note)?
         }
@@ -68,7 +59,7 @@ pub async fn push_with_options(coordinator: Coordinator<'_>, params: CallOpt) ->
 
     // send it
     let call = coordinator.call_new_with_recipient_and_payload(p.quorum_id, &payload);
-    let client = coordinator.messenger().expect("messenger must be init");
+    let client = coordinator.messenger();
     client.connect().await;
 
     if params.dryrun {
@@ -83,7 +74,7 @@ pub async fn push_with_options(coordinator: Coordinator<'_>, params: CallOpt) ->
 
 /// Push a plain text note.
 pub async fn push(coordinator: Coordinator<'_>, note: &str) -> Result<()> {
-    let client = coordinator.messenger().expect("must have msg client");
+    let client = coordinator.messenger();
     client.connect().await;
     let event_id = client.publish_text_note(note, None).await?;
     println!("Sent: {}", event_id);
@@ -92,13 +83,7 @@ pub async fn push(coordinator: Coordinator<'_>, note: &str) -> Result<()> {
 
 /// Fetch events from quorum participants.
 pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
-    let client = coordinator.messenger().unwrap();
-    let k = match client.signer().await? {
-        ClientSigner::Keys(k) => k,
-        _ => panic!("only keys signers allowed"),
-    };
-    let my_sec = k.secret_key()?;
-
+    let client = coordinator.messenger();
     client.connect().await;
 
     let subs = Filter::new()
@@ -122,11 +107,14 @@ pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
     // quorum's fp. When a match is found, we derive the participant from the parsed pid.
     // If the derived participant's pk matches the current user's pk, we reconstruct the
     // conversation key according to nip44 and decrypt.
+    let k = coordinator.keys().await?;
+    let my_sec = k.secret_key()?;
+
     for (pk, message) in messages {
+        // TODO: get alias from author pk
         if !message.starts_with(loon::HRP) {
-            // TODO: get alias from author pk
-            println!("{}", message);
-            return Ok(());
+            //println!("{}", message);
+            continue;
         }
 
         // parse quorum fp
@@ -173,7 +161,7 @@ pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
 /// Fetch events from quorum participants.
 #[allow(dead_code)]
 pub async fn fetch(coordinator: Coordinator<'_>) -> Result<()> {
-    let client = coordinator.messenger().unwrap();
+    let client = coordinator.messenger();
     client.connect().await;
 
     let subs = Filter::new()

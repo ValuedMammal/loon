@@ -81,6 +81,8 @@ pub enum WalletSubCmd {
     // Load, unload wallet
     //Load,
     //Unload,
+    /// Display the alias for the current user.
+    Whoami,
 }
 
 #[derive(Subcommand)]

@@ -11,17 +11,22 @@ pub use coordinator::HRP;
 pub use nostr_sdk::prelude as nostr;
 
 /// Crate errors.
-#[allow(unused)]
 #[derive(Debug)]
 pub enum Error {
-    /// ParseInt
-    ParseInt,
+    /// Builder
+    Builder,
+    /// Coordinator
+    Coordinator(String),
+    /// Nostr client
+    Nostr(nostr_sdk::client::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ParseInt => write!(f, "failed parsing integer from string"),
+            Self::Builder => write!(f, "not all required fields present"),
+            Self::Coordinator(e) => e.fmt(f),
+            Self::Nostr(e) => e.fmt(f),
         }
     }
 }

@@ -72,9 +72,9 @@ async fn main() -> cmd::Result<()> {
     let wallet = Wallet::new_or_load(&descriptor, None, store, Network::Signet)?;
 
     // Create Coordinator
-    let mut coordinator = Coordinator::new(&nick, wallet);
-    coordinator.with_client_nostr(client);
-    coordinator.with_client_rpc(core);
+    let mut builder = Coordinator::builder(&nick, wallet);
+    builder.with_nostr(client).with_oracle(core);
+    let mut coordinator = builder.build()?;
 
     // fill participants
     for friend in friends {
@@ -87,7 +87,7 @@ async fn main() -> cmd::Result<()> {
         Cmd::Call(param) => cmd::call::push_with_options(coordinator, param).await?,
         Cmd::Fetch => cmd::call::fetch_and_decrypt(coordinator).await?,
         Cmd::Push { note } => cmd::call::push(coordinator, &note).await?,
-        Cmd::Wallet(subcmd) => cmd::wallet::execute(coordinator, subcmd)?,
+        Cmd::Wallet(subcmd) => cmd::wallet::execute(coordinator, subcmd).await?,
     }
 
     Ok(())

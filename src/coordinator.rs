@@ -10,6 +10,7 @@ use super::nostr;
 use super::nostr::XOnlyPublicKey;
 use super::nostr::FromBech32;
 use crate::db;
+use crate::Error;
 
 /// Human-readable part of a loon call.
 pub const HRP: &str = "loon1";
@@ -24,31 +25,19 @@ pub struct Coordinator<'a> {
     // relates quorum_id to a participant
     participants: BTreeMap<Pid, Participant>,
     // nostr client
-    messenger: Option<nostr::Client>,
+    messenger: nostr::Client,
     // source of chain data
-    blockchain: Option<bitcoincore_rpc::Client>,
+    oracle: bitcoincore_rpc::Client,
 }
 
 impl<'a> Coordinator<'a> {
-    /// Construct a new Coordinator.
-    pub fn new(label: &str, wallet: bdk::Wallet<Store<'a, ChangeSet>>) -> Self {
-        Coordinator {
-            label: label.to_owned(),
-            wallet,
-            participants: BTreeMap::new(),
-            messenger: None,
-            blockchain: None,
-        }
-    }
-
-    /// Set nostr client.
-    pub fn with_client_nostr(&mut self, client: nostr::Client) {
-        self.messenger = Some(client)
-    }
-
-    /// Set RPC client.
-    pub fn with_client_rpc(&mut self, client: bitcoincore_rpc::Client) {
-        self.blockchain = Some(client)
+    /// Build a Coordinator from parts.
+    ///
+    /// See [`Builder`].
+    pub fn builder(label: &str, wallet: bdk::Wallet<Store<'a, ChangeSet>>) -> Builder<'a> {
+        let mut builder = Builder::default();
+        builder.label(label).wallet(wallet);
+        builder
     }
 
     /// Insert a participant.
@@ -77,13 +66,22 @@ impl<'a> Coordinator<'a> {
     }
 
     /// Get a reference to the message client.
-    pub fn messenger(&self) -> Option<&nostr::Client> {
-        self.messenger.as_ref()
+    pub fn messenger(&self) -> &nostr::Client {
+        &self.messenger
     }
 
     /// Get a reference to the chain backend.
-    pub fn chain(&self) -> Option<&bitcoincore_rpc::Client> {
-        self.blockchain.as_ref()
+    pub fn chain(&self) -> &bitcoincore_rpc::Client {
+        &self.oracle
+    }
+
+    /// Get nostr keys.
+    pub async fn keys(&self) -> Result<nostr::Keys, Error> {
+        let signer = self.messenger.signer().await.map_err(Error::Nostr)?;
+        let nostr::ClientSigner::Keys(k) = signer else {
+            return Err(Error::Coordinator("only Keys signers allowed".to_string()));
+        };
+        Ok(k)
     }
 
     /// Returns the unique fingerprint of the active quorum.
@@ -106,6 +104,60 @@ impl<'a> Coordinator<'a> {
             .push(recipient)
             .build(payload);
         call
+    }
+}
+
+/// Builder.
+#[derive(Debug, Default)]
+pub struct Builder<'a> {
+    label: Option<String>,
+    wallet: Option<bdk::Wallet<Store<'a, ChangeSet>>>,
+    messenger: Option<nostr::Client>,
+    oracle: Option<bitcoincore_rpc::Client>,
+}
+
+impl<'a> Builder<'a> {
+    /// Setter for label.
+    fn label(&mut self, label: &str) -> &mut Self {
+        self.label = Some(label.to_string());
+        self
+    }
+
+    /// Setter for wallet.
+    fn wallet(&mut self, wallet: bdk::Wallet<Store<'a, ChangeSet>>) -> &mut Self {
+        self.wallet = Some(wallet);
+        self
+    }
+
+    /// Setter for nostr client.
+    pub fn with_nostr(&mut self, client: nostr::Client) -> &mut Self {
+        self.messenger = Some(client);
+        self
+    }
+
+    /// Setter for chain oracle.
+    pub fn with_oracle(&mut self, client: bitcoincore_rpc::Client) -> &mut Self {
+        self.oracle = Some(client);
+        self
+    }
+
+    /// Finish building and return a new Coordinator.
+    pub fn build(self) -> Result<Coordinator<'a>, Error> {
+        if self.label.is_none()
+            || self.wallet.is_none()
+            || self.messenger.is_none()
+            || self.oracle.is_none()
+        {
+            return Err(Error::Builder);
+        }
+
+        Ok(Coordinator {
+            label: self.label.unwrap(),
+            wallet: self.wallet.unwrap(),
+            participants: BTreeMap::new(),
+            messenger: self.messenger.unwrap(),
+            oracle: self.oracle.unwrap(),
+        })
     }
 }
 
