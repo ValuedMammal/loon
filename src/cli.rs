@@ -21,8 +21,8 @@ pub enum Cmd {
     Desc(DescSubCmd),
     /// Fetch notes from quorum participants.
     Fetch,
-    // Periodically fetch notes in a background thread.
-    //Listen,
+    /// Periodically fetch notes in a background thread.
+    Listen,
     /// Push a plain text note.
     Push {
         /// Text

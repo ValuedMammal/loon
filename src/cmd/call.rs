@@ -1,3 +1,6 @@
+use std::time::Duration;
+use tokio::time;
+
 use loon::CallTy;
 use loon::Coordinator;
 
@@ -82,7 +85,7 @@ pub async fn push(coordinator: Coordinator<'_>, note: &str) -> Result<()> {
 }
 
 /// Fetch events from quorum participants.
-pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
+pub async fn fetch_and_decrypt(coordinator: &Coordinator<'_>) -> Result<()> {
     let client = coordinator.messenger();
     client.connect().await;
 
@@ -111,9 +114,15 @@ pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
     let my_sec = k.secret_key()?;
 
     for (pk, message) in messages {
-        // TODO: get alias from author pk
+        let alias = coordinator
+            .participants()
+            .filter(|(_id, p)| p.pk == pk)
+            .map(|(_, p)| p.alias.clone())
+            .next()
+            .expect("we subscribed to the pk")
+            .unwrap_or_default();
         if !message.starts_with(loon::HRP) {
-            //println!("{}", message);
+            println!("{}: {}", alias, message);
             continue;
         }
 
@@ -130,7 +139,7 @@ pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
                 .find(|(pid, _p)| pid.as_u32() == quid);
 
             if let Some((_pid, p)) = p {
-                // proceed if we are the intended recipient
+                // parse payload for the intended recipient
                 if p.pk == k.public_key() {
                     assert!(message.len() > 15);
                     let payload = &message[15..];
@@ -149,13 +158,23 @@ pub async fn fetch_and_decrypt(coordinator: Coordinator<'_>) -> Result<()> {
                         }
                     };
 
-                    println!("{}", res);
+                    println!("{}: {}", alias, res);
                 }
             }
         }
     }
 
     Ok(())
+}
+
+/// Listens for incoming calls, and writes to a log file (or database?).
+pub async fn listen(coordinator: &Coordinator<'_>) -> Result<()> {
+    loop {
+        fetch_and_decrypt(coordinator).await?;
+
+        // TODO filter already seen event ids
+        time::sleep(Duration::from_secs(7)).await;
+    }
 }
 
 /// Fetch events from quorum participants.
