@@ -3,12 +3,11 @@ use std::fmt;
 mod coordinator;
 pub mod db;
 
-pub use coordinator::Coordinator;
-pub use coordinator::CallTy;
-pub use coordinator::Call;
-pub use coordinator::Participant;
-pub use coordinator::HRP;
-pub use nostr_sdk::prelude as nostr;
+pub use {
+    // Re-exports
+    coordinator::{Coordinator, CallTy, Call, Participant, HRP},
+    nostr_sdk::prelude as nostr,
+};
 
 /// Crate errors.
 #[derive(Debug)]
