@@ -15,7 +15,7 @@ use crate::cli::Recipient;
 const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
 /// Push an encrypted payload to a desginated recipient.
-pub async fn push_with_options(coordinator: Coordinator<'_>, params: CallOpt) -> Result<()> {
+pub async fn push_with_options(coordinator: Coordinator, params: CallOpt) -> Result<()> {
     let CallOpt {
         recipient,
         note,
@@ -76,7 +76,7 @@ pub async fn push_with_options(coordinator: Coordinator<'_>, params: CallOpt) ->
 }
 
 /// Push a plain text note.
-pub async fn push(coordinator: Coordinator<'_>, note: &str) -> Result<()> {
+pub async fn push(coordinator: Coordinator, note: &str) -> Result<()> {
     let client = coordinator.messenger();
     client.connect().await;
     let event_id = client.publish_text_note(note, None).await?;
@@ -85,7 +85,7 @@ pub async fn push(coordinator: Coordinator<'_>, note: &str) -> Result<()> {
 }
 
 /// Fetch events from quorum participants.
-pub async fn fetch_and_decrypt(coordinator: &Coordinator<'_>) -> Result<()> {
+pub async fn fetch_and_decrypt(coordinator: &Coordinator) -> Result<()> {
     let client = coordinator.messenger();
     client.connect().await;
 
@@ -168,7 +168,7 @@ pub async fn fetch_and_decrypt(coordinator: &Coordinator<'_>) -> Result<()> {
 }
 
 /// Listens for incoming calls, and writes to a log file (or database?).
-pub async fn listen(coordinator: &Coordinator<'_>) -> Result<()> {
+pub async fn listen(coordinator: &Coordinator) -> Result<()> {
     loop {
         fetch_and_decrypt(coordinator).await?;
 
@@ -179,7 +179,7 @@ pub async fn listen(coordinator: &Coordinator<'_>) -> Result<()> {
 
 /// Fetch events from quorum participants.
 #[allow(dead_code)]
-pub async fn fetch(coordinator: Coordinator<'_>) -> Result<()> {
+pub async fn fetch(coordinator: Coordinator) -> Result<()> {
     let client = coordinator.messenger();
     client.connect().await;
 

@@ -21,10 +21,10 @@ tokio = { version = "1", features = ["full"] }
 
 [dependencies.bdk]
 git = "https://github.com/bitcoindevkit/bdk"
-rev = "9efaead8f16a5a0bed18cea514cd94d6a9a0a582"
-version = "1.0.0-alpha.3"
+rev = "ba7624781d4b48a3b84cda31c789240913f0d6b2"
+version = "1.0.0-alpha.5"
 
 [dependencies.bdk_file_store]
 git = "https://github.com/bitcoindevkit/bdk"
-rev = "9efaead8f16a5a0bed18cea514cd94d6a9a0a582"
-#version = "0.3.0"
+rev = "ba7624781d4b48a3b84cda31c789240913f0d6b2"
+#version = "0.5.0"

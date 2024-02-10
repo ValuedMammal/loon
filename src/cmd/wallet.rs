@@ -7,7 +7,7 @@ use crate::cli::AddressSubCmd;
 use crate::cli::WalletSubCmd;
 
 // Perform wallet operations.
-pub async fn execute(mut coordinator: Coordinator<'_>, subcmd: WalletSubCmd) -> Result<()> {
+pub async fn execute(mut coordinator: Coordinator, subcmd: WalletSubCmd) -> Result<()> {
     match subcmd {
         // Address
         WalletSubCmd::Address(cmd) => {

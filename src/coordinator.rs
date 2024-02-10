@@ -17,11 +17,11 @@ pub const HRP: &str = "loon1";
 
 /// Coordinator
 #[derive(Debug)]
-pub struct Coordinator<'a> {
+pub struct Coordinator {
     // account short name
     label: String,
     // bdk Wallet
-    wallet: bdk::Wallet<Store<'a, ChangeSet>>,
+    wallet: bdk::Wallet<Store<ChangeSet>>,
     // relates quorum_id to a participant
     participants: BTreeMap<Pid, Participant>,
     // nostr client
@@ -30,11 +30,11 @@ pub struct Coordinator<'a> {
     oracle: bitcoincore_rpc::Client,
 }
 
-impl<'a> Coordinator<'a> {
+impl Coordinator {
     /// Build a Coordinator from parts.
     ///
     /// See [`Builder`].
-    pub fn builder(label: &str, wallet: bdk::Wallet<Store<'a, ChangeSet>>) -> Builder<'a> {
+    pub fn builder(label: &str, wallet: bdk::Wallet<Store<ChangeSet>>) -> Builder {
         let mut builder = Builder::default();
         builder.label(label).wallet(wallet);
         builder
@@ -56,7 +56,7 @@ impl<'a> Coordinator<'a> {
     }
 
     /// Get a mutable reference to the `Wallet`.
-    pub fn wallet(&mut self) -> &mut bdk::Wallet<Store<'a, ChangeSet>> {
+    pub fn wallet(&mut self) -> &mut bdk::Wallet<Store<ChangeSet>> {
         &mut self.wallet
     }
 
@@ -109,14 +109,14 @@ impl<'a> Coordinator<'a> {
 
 /// Builder.
 #[derive(Debug, Default)]
-pub struct Builder<'a> {
+pub struct Builder {
     label: Option<String>,
-    wallet: Option<bdk::Wallet<Store<'a, ChangeSet>>>,
+    wallet: Option<bdk::Wallet<Store<ChangeSet>>>,
     messenger: Option<nostr::Client>,
     oracle: Option<bitcoincore_rpc::Client>,
 }
 
-impl<'a> Builder<'a> {
+impl Builder {
     /// Setter for label.
     fn label(&mut self, label: &str) -> &mut Self {
         self.label = Some(label.to_string());
@@ -124,7 +124,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Setter for wallet.
-    fn wallet(&mut self, wallet: bdk::Wallet<Store<'a, ChangeSet>>) -> &mut Self {
+    fn wallet(&mut self, wallet: bdk::Wallet<Store<ChangeSet>>) -> &mut Self {
         self.wallet = Some(wallet);
         self
     }
@@ -142,7 +142,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Finish building and return a new Coordinator.
-    pub fn build(self) -> Result<Coordinator<'a>, Error> {
+    pub fn build(self) -> Result<Coordinator, Error> {
         if self.label.is_none()
             || self.wallet.is_none()
             || self.messenger.is_none()
