@@ -32,6 +32,15 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// Chat entry.
+#[derive(Debug)]
+pub struct ChatEntry {
+    /// Sender alias
+    pub alias: String,
+    /// Text message
+    pub message: String,
+}
+
 #[cfg(test)]
 mod test {
     //use super::*;

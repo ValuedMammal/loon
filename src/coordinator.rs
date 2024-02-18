@@ -214,6 +214,7 @@ impl fmt::Display for Pid {
 }
 
 /// Types of calls.
+#[derive(Debug)]
 pub enum CallTy {
     /// Nack
     Nack,

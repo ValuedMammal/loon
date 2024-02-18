@@ -1,11 +1,16 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::time::Duration;
 use tokio::time;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
 
 use loon::CallTy;
+use loon::ChatEntry;
 use loon::Coordinator;
 
-use super::nostr::{Filter, Kind, Timestamp, XOnlyPublicKey};
 use super::nostr::nip44;
+use super::nostr::{Filter, EventId, Kind, Timestamp, XOnlyPublicKey};
 use super::Result;
 use super::bail;
 use crate::cli::CallOpt;
@@ -84,35 +89,61 @@ pub async fn push(coordinator: Coordinator, note: &str) -> Result<()> {
     Ok(())
 }
 
-/// Fetch events from quorum participants.
+/// Encrypted raw messages with author, keyed by EventId.
+type RawEntries = HashMap<EventId, (XOnlyPublicKey, String)>;
+
+/// Fetch latest notes by quorum parties, printing results to stdout.
 pub async fn fetch_and_decrypt(coordinator: &Coordinator) -> Result<()> {
+    let raw_entries = fetch_raw_entries(coordinator).await?;
+    let entries = decrypt_raw_entries(coordinator, raw_entries.values().cloned()).await?;
+    for entry in entries {
+        println!("{}: {}", entry.alias, entry.message);
+    }
+    Ok(())
+}
+
+/// Fetch events from quorum participants.
+async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
     let client = coordinator.messenger();
     client.connect().await;
+    let mut ret = RawEntries::new();
 
-    let subs = Filter::new()
-        .authors(coordinator.participants().map(|(_id, p)| p.pk))
-        .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
-    let events = client
-        .get_events_of(vec![subs], Some(super::TIMEOUT))
-        .await?;
-    let messages: Vec<(XOnlyPublicKey, String)> = events
-        .iter()
-        .filter(|event| matches!(event.kind, Kind::TextNote))
-        .map(|e| {
-            let author = e.author();
-            let content = e.content().to_owned();
-            (author, content)
+    let subs: Vec<Filter> = coordinator
+        .participants()
+        .map(|(_id, p)| {
+            Filter::new()
+                .author(p.pk)
+                .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into())
         })
         .collect();
 
-    // Decrypt nip44
-    // If we see HRP, we read the message fingerprint and check if it matches the current
-    // quorum's fp. When a match is found, we derive the participant from the parsed pid.
-    // If the derived participant's pk matches the current user's pk, we reconstruct the
-    // conversation key according to nip44 and decrypt.
+    let events = client.get_events_of(subs, Some(super::TIMEOUT)).await?;
+
+    events
+        .iter()
+        .filter(|event| matches!(event.kind, Kind::TextNote))
+        .for_each(|e| {
+            let author = e.author();
+            let content = e.content().to_owned();
+            ret.insert(e.id(), (author, content));
+        });
+
+    Ok(ret)
+}
+
+/// Decrypt nip44.
+async fn decrypt_raw_entries(
+    coordinator: &Coordinator,
+    messages: impl IntoIterator<Item = (XOnlyPublicKey, String)>,
+) -> Result<Vec<ChatEntry>> {
     let k = coordinator.keys().await?;
     let my_sec = k.secret_key()?;
+    let mut ret = vec![];
 
+    // If we see HRP, we read the message fingerprint and check if it matches the current
+    // quorum's FP. When a match is found, we derive the participant from the parsed PID.
+    // If the derived participant's PK matches the current user's PK, we reconstruct the
+    // conversation key according to nip44 and decrypt.
     for (pk, message) in messages {
         let alias = coordinator
             .participants()
@@ -122,58 +153,83 @@ pub async fn fetch_and_decrypt(coordinator: &Coordinator) -> Result<()> {
             .expect("we subscribed to the pk")
             .unwrap_or_default();
         if !message.starts_with(loon::HRP) {
-            println!("{}: {}", alias, message);
+            ret.push(ChatEntry { alias, message });
             continue;
         }
 
-        // parse quorum fp
-        let qfp = &message[5..13];
-        if qfp == coordinator.quorum_fingerprint().as_str() {
+        // parse quorum FP
+        let quorum_fp = &message[5..13];
+        if quorum_fp == coordinator.quorum_fingerprint().as_str() {
             // parse two-digit pid, e.g. '02'
             let quid: u32 = message[13..15].parse()?;
 
             // derive recipient p from quorum id
             // we should get one because the message fp matches the active quorum
-            let p = coordinator
+            let participant = coordinator
                 .participants()
                 .find(|(pid, _p)| pid.as_u32() == quid);
 
-            if let Some((_pid, p)) = p {
+            if let Some((_pid, participant)) = participant {
                 // parse payload for the intended recipient
-                if p.pk == k.public_key() {
+                if participant.pk == k.public_key() {
                     assert!(message.len() > 15);
                     let payload = &message[15..];
                     let res = match payload {
                         "0" => CallTy::Nack,
                         "1" => CallTy::Ack,
                         _ => {
-                            // reconstruct the conversation key
-                            // `nip44::v2::decrypt` requires that we base64 decode the payload
-                            //let conv = nip44::v2::ConversationKey::derive(&my_sec, &pk);
-                            //let data: Vec<u8> = general_purpose::STANDARD.decode(payload)?;
-                            //let res = nip44::v2::decrypt(&conv, data)?;
-                            // alternatively,
                             let m = nip44::decrypt(&my_sec, &pk, payload)?;
                             CallTy::Note(m)
                         }
                     };
 
-                    println!("{}: {}", alias, res);
+                    ret.push(ChatEntry {
+                        alias,
+                        message: res.to_string(),
+                    });
                 }
             }
         }
     }
 
-    Ok(())
+    Ok(ret)
 }
 
-/// Listens for incoming calls, and writes to a log file (or database?).
+/// Listens for incoming calls, and writes to a log file.
+// or write to database?
 pub async fn listen(coordinator: &Coordinator) -> Result<()> {
-    loop {
-        fetch_and_decrypt(coordinator).await?;
+    let cargo_dir = env!("CARGO_MANIFEST_DIR");
+    let path = format!("{}/chat.log", cargo_dir);
+    let mut f = fs::File::options().append(true).open(&path).await?;
 
-        // TODO filter already seen event ids
-        time::sleep(Duration::from_secs(7)).await;
+    // keep track of events seen
+    let mut event_ids = HashSet::<EventId>::new();
+
+    loop {
+        let raw_entries = fetch_raw_entries(coordinator).await?;
+
+        // only log new events
+        if !raw_entries.is_empty() {
+            let raw_entries_iter = raw_entries.into_iter().filter_map(|(event, entry)| {
+                if !event_ids.contains(&event) {
+                    event_ids.insert(event);
+                    Some(entry)
+                } else {
+                    None
+                }
+            });
+            let chat_entries = decrypt_raw_entries(coordinator, raw_entries_iter).await?;
+            for entry in chat_entries {
+                let content = match entry.message.as_bytes() {
+                    b if b.len() < 1024 => format!("{}: {}\n", entry.alias, entry.message),
+                    _ => "message too long, skipping\n".to_string(),
+                };
+                let _ = f.write(content.as_bytes()).await?;
+            }
+        }
+
+        // refresh on 10s interval
+        time::sleep(Duration::from_secs(10)).await;
     }
 }
 
