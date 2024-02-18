@@ -1,5 +1,6 @@
 pub mod call;
 pub mod descriptor;
+pub mod fetch;
 pub mod wallet;
 
 pub use nostr_sdk::prelude as nostr;

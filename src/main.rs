@@ -84,10 +84,14 @@ async fn main() -> cmd::Result<()> {
 
     match args.cmd {
         Cmd::Desc(subcmd) => cmd::descriptor::execute(coordinator, subcmd)?,
-        Cmd::Call(param) => cmd::call::push_with_options(coordinator, param).await?,
-        Cmd::Fetch => cmd::call::fetch_and_decrypt(&coordinator).await?,
-        Cmd::Listen => cmd::call::listen(&coordinator).await?,
-        Cmd::Push { note } => cmd::call::push(coordinator, &note).await?,
+        Cmd::Call(subcmd) => cmd::call::push(coordinator, subcmd).await?,
+        Cmd::Fetch { listen } => {
+            if listen {
+                cmd::fetch::listen(&coordinator).await?
+            } else {
+                cmd::fetch::fetch_and_decrypt(&coordinator).await?
+            }
+        }
         Cmd::Wallet(subcmd) => cmd::wallet::execute(coordinator, subcmd).await?,
     }
 

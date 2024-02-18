@@ -14,24 +14,35 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Push a private note to a quorum participant.
-    Call(CallOpt),
+    /// Push notes.
+    #[clap(subcommand)]
+    Call(CallSubCmd),
     /// Descriptors operations.
     #[clap(subcommand)]
     Desc(DescSubCmd),
     /// Fetch notes from quorum participants.
-    Fetch,
-    /// Poll for new notes continuously.
-    Listen,
+    Fetch {
+        /// Poll for new notes continuously.
+        #[clap(long, short = 'l')]
+        listen: bool,
+    },
+    // PSBT operations.
+    //Psbt,
+    /// Wallet operations.
+    #[clap(subcommand)]
+    Wallet(WalletSubCmd),
+}
+
+#[derive(Subcommand)]
+pub enum CallSubCmd {
+    /// Construct a new private note.
+    New(CallOpt),
     /// Push a plain text note.
     Push {
         /// Text
         #[clap(required = true)]
         note: String,
     },
-    /// Wallet operations.
-    #[clap(subcommand)]
-    Wallet(WalletSubCmd),
 }
 
 #[derive(Parser)]
