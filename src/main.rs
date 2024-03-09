@@ -36,6 +36,7 @@ async fn main() -> cmd::Result<()> {
     client.add_relay("wss://relay.damus.io").await?;
 
     // Get account nick from user
+    // TODO: handle case where `nick` is None, i.e. we want to create a new wallet.
     let nick = args.nick.unwrap_or("test".to_string());
 
     // Get descriptors from loon db

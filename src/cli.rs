@@ -89,9 +89,11 @@ pub enum WalletSubCmd {
     Address(AddressSubCmd),
     // Psbt (new, combine)
     //Psbt,
-    // Load, unload wallet
-    //Load,
-    //Unload,
+    /// New
+    New {
+        #[clap(required = true)]
+        descriptor: String,
+    },
     /// Display the alias for the current user.
     Whoami,
 }
