@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use bdk_file_store::Store;
-use bdk::wallet::ChangeSet;
-use bdk::bitcoin::hashes::Hash;
 use bdk::bitcoin::hashes::sha256;
+use bdk::bitcoin::hashes::Hash;
+use bdk::wallet::ChangeSet;
+use bdk_file_store::Store;
 
 use super::nostr;
-use super::nostr::XOnlyPublicKey;
 use super::nostr::FromBech32;
+use super::nostr::XOnlyPublicKey;
 use crate::db;
 use crate::Error;
 
@@ -55,8 +55,13 @@ impl Coordinator {
         &self.label
     }
 
+    /// Get a reference to the `Wallet`.
+    pub fn wallet(&self) -> &bdk::Wallet<Store<ChangeSet>> {
+        &self.wallet
+    }
+
     /// Get a mutable reference to the `Wallet`.
-    pub fn wallet(&mut self) -> &mut bdk::Wallet<Store<ChangeSet>> {
+    pub fn wallet_mut(&mut self) -> &mut bdk::Wallet<Store<ChangeSet>> {
         &mut self.wallet
     }
 
@@ -101,7 +106,7 @@ impl Coordinator {
     pub fn call_new_with_recipient_and_payload(&self, recipient: Pid, payload: &str) -> Call {
         let mut call = Call::new(HRP);
         call.push(&self.quorum_fingerprint())
-            .push(recipient)
+            .push(&recipient.to_string())
             .build(payload);
         call
     }
@@ -188,7 +193,7 @@ pub struct Pid(u32);
 
 impl Pid {
     /// Get the Pid as u32.
-    pub fn as_u32(&self) -> u32 {
+    pub fn as_u32(self) -> u32 {
         self.0
     }
 }
@@ -257,19 +262,19 @@ pub struct Call(String);
 
 impl Call {
     /// Constructs a new `Call`.
-    fn new(s: impl ToString) -> Self {
+    fn new(s: &str) -> Self {
         Self(s.to_string())
     }
 
     /// Push an `item` onto `self`.
-    fn push(&mut self, item: impl ToString) -> &mut Self {
-        self.0.push_str(item.to_string().as_str());
+    fn push(&mut self, item: &str) -> &mut Self {
+        self.0.push_str(item);
         self
     }
 
     /// Appends the `payload`.
     fn build(&mut self, payload: &str) {
-        self.0.push_str(payload)
+        self.0.push_str(payload);
     }
 }
 

@@ -3,7 +3,7 @@ name = "loon"
 version = "0.1.0"
 authors = ["ValuedMammal <valuedmammal@protonmail.com>"]
 edition = "2021"
-description = "Loon wallet + multisig coordinator"
+description = "Loon wallet - coordination at a distance"
 repository = "https://github.com/ValuedMammal/loon"
 keywords = ["bitcoin", "nostr"]
 
@@ -11,20 +11,18 @@ keywords = ["bitcoin", "nostr"]
 
 [dependencies]
 anyhow = "1"
-#base64 = "0.21.7"
 bitcoincore-rpc = "0.17"
 clap = { version = "4.4.8", features = ["derive"] }
 nostr-sdk = { version = "0.27" }
-#serde = { version = "1.0", features = ["derive"] }
 rusqlite = "0.30"
 tokio = { version = "1", features = ["full"] }
 
 [dependencies.bdk]
 git = "https://github.com/bitcoindevkit/bdk"
-rev = "ba7624781d4b48a3b84cda31c789240913f0d6b2"
-version = "1.0.0-alpha.5"
+rev = "b5557dce70495adfd8e0951a35509f48724dfa81"
+#version = "1.0.0-alpha.8"
 
 [dependencies.bdk_file_store]
 git = "https://github.com/bitcoindevkit/bdk"
-rev = "ba7624781d4b48a3b84cda31c789240913f0d6b2"
-#version = "0.5.0"
+rev = "b5557dce70495adfd8e0951a35509f48724dfa81"
+#version = "0.8.0"

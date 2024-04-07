@@ -1,7 +1,6 @@
 use clap::Parser;
 use clap::Subcommand;
 
-/// Loon - Coordination at a distance.
 #[derive(Parser)]
 #[clap(author, about)]
 pub struct Args {
@@ -87,13 +86,13 @@ pub enum WalletSubCmd {
     /// Address
     #[clap(subcommand)]
     Address(AddressSubCmd),
-    // Psbt (new, combine)
-    //Psbt,
     /// New
     New {
         #[clap(required = true)]
         descriptor: String,
     },
+    /// Transactions
+    Transactions,
     /// Display the alias for the current user.
     Whoami,
 }

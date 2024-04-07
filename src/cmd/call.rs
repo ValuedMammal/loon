@@ -1,15 +1,15 @@
 use loon::CallTy;
 use loon::Coordinator;
 
+use super::bail;
 use super::nostr::nip44;
 use super::Result;
-use super::bail;
 use crate::cli::CallOpt;
 use crate::cli::CallSubCmd;
 use crate::cli::Recipient;
 
 /// Push notes.
-pub async fn push(coordinator: Coordinator, cmd: CallSubCmd) -> Result<()> {
+pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
     match cmd {
         // Push a plain text note.
         CallSubCmd::Push { note } => {

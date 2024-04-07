@@ -15,6 +15,7 @@ Coordination at a distance
 |:----:|--------|
 |✅ | Finalize [v1 spec](./doc/specification.md) (in progress) |
 |_ | Demo user flow |
-|_ | Implement `listen` cmd |
+|✅ | Implement `listen` cmd |
+|_ | Sync! |
 |_ | Use multipath descriptors |
 |_ | Design a policy/quorum builder |

@@ -5,7 +5,7 @@ pub mod db;
 
 pub use {
     // Re-exports
-    coordinator::{Coordinator, CallTy, Call, Participant, HRP},
+    coordinator::{Call, CallTy, Coordinator, Participant, HRP},
     nostr_sdk::prelude as nostr,
 };
 

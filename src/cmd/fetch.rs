@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::time::Duration;
-use tokio::time;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::time;
 
 use loon::CallTy;
 use loon::ChatEntry;
 use loon::Coordinator;
 
 use super::nostr::nip44;
-use super::nostr::{Filter, EventId, Kind, Timestamp, XOnlyPublicKey};
+use super::nostr::{EventId, Filter, Kind, Timestamp, XOnlyPublicKey};
 use super::Result;
 
 /// How far to look back in time when polling the relay, currently one fortnight.
 const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
-/// Encrypted raw messages with author, keyed by EventId.
+/// Encrypted raw messages with author, keyed by `EventId`.
 type RawEntries = HashMap<EventId, (XOnlyPublicKey, String)>;
 
 /// Fetch latest notes by quorum parties, printing results to stdout.
@@ -138,11 +138,11 @@ pub async fn listen(coordinator: &Coordinator) -> Result<()> {
         // only log new events
         if !raw_entries.is_empty() {
             let raw_entries_iter = raw_entries.into_iter().filter_map(|(event, entry)| {
-                if !event_ids.contains(&event) {
+                if event_ids.contains(&event) {
+                    None
+                } else {
                     event_ids.insert(event);
                     Some(entry)
-                } else {
-                    None
                 }
             });
             let chat_entries = decrypt_raw_entries(coordinator, raw_entries_iter).await?;

@@ -6,7 +6,7 @@ use loon::Coordinator;
 use crate::cli::DescSubCmd;
 
 // Core RPCs related to descriptors, useful for quick debugging
-pub fn execute(coordinator: Coordinator, subcmd: DescSubCmd) -> super::Result<()> {
+pub fn execute(coordinator: &Coordinator, subcmd: DescSubCmd) -> super::Result<()> {
     let client = coordinator.chain();
 
     match subcmd {

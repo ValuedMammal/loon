@@ -7,7 +7,7 @@ use crate::cli::AddressSubCmd;
 use crate::cli::WalletSubCmd;
 
 // Perform wallet operations.
-pub async fn execute(mut coordinator: Coordinator, subcmd: WalletSubCmd) -> Result<()> {
+pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()> {
     match subcmd {
         // New
         WalletSubCmd::New { descriptor } => {
@@ -25,21 +25,31 @@ pub async fn execute(mut coordinator: Coordinator, subcmd: WalletSubCmd) -> Resu
         WalletSubCmd::Address(cmd) => match cmd {
             AddressSubCmd::New => println!(
                 "{:?}",
-                coordinator.wallet().try_get_address(AddressIndex::New)
+                coordinator
+                    .wallet_mut()
+                    .try_get_address(AddressIndex::New)?
             ),
+            // TODO: consider make this list the next N unused addresses, with a cli option to
+            // only output one. try to fix this in BDK.
             AddressSubCmd::Next => println!(
                 "{:?}",
                 coordinator
-                    .wallet()
-                    .try_get_address(AddressIndex::LastUnused)
+                    .wallet_mut()
+                    .try_get_address(AddressIndex::LastUnused)?
             ),
             AddressSubCmd::Peek { index } => println!(
                 "{:?}",
                 coordinator
-                    .wallet()
-                    .try_get_address(AddressIndex::Peek(index))
+                    .wallet_mut()
+                    .try_get_address(AddressIndex::Peek(index))?
             ),
         },
+        // List wallet transactions
+        WalletSubCmd::Transactions => {
+            for canonical_tx in coordinator.wallet().transactions() {
+                println!("Txid: {}", canonical_tx.tx_node.txid);
+            }
+        }
         // Display the person alias for the current user.
         WalletSubCmd::Whoami => {
             let my_pk = coordinator.keys().await?.public_key();
@@ -49,7 +59,7 @@ pub async fn execute(mut coordinator: Coordinator, subcmd: WalletSubCmd) -> Resu
                 .find(|(_pid, p)| p.pk == my_pk)
                 .expect("must find participant");
 
-            println!("{}: {}", pid, p.alias.clone().unwrap_or("None".to_string()))
+            println!("{}: {}", pid, p.alias.clone().unwrap_or("None".to_string()));
         }
     }
 
