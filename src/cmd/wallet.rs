@@ -1,4 +1,4 @@
-use bdk::wallet::AddressIndex;
+use bdk_wallet::KeychainKind;
 use loon::Coordinator;
 
 use super::Result;
@@ -27,21 +27,19 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                 "{:?}",
                 coordinator
                     .wallet_mut()
-                    .try_get_address(AddressIndex::New)?
+                    .reveal_next_address(KeychainKind::External)
             ),
-            // TODO: consider make this list the next N unused addresses, with a cli option to
-            // only output one. try to fix this in BDK.
             AddressSubCmd::Next => println!(
                 "{:?}",
                 coordinator
                     .wallet_mut()
-                    .try_get_address(AddressIndex::LastUnused)?
+                    .next_unused_address(KeychainKind::External)
             ),
             AddressSubCmd::Peek { index } => println!(
                 "{:?}",
                 coordinator
                     .wallet_mut()
-                    .try_get_address(AddressIndex::Peek(index))?
+                    .peek_address(KeychainKind::External, index)
             ),
         },
         // List wallet transactions

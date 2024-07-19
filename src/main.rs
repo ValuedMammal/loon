@@ -1,10 +1,9 @@
 use std::env;
-use std::path;
 
-use bdk::bitcoin::Network;
-use bdk::wallet::ChangeSet;
-use bdk::Wallet;
-use bdk_file_store::Store;
+use bdk_wallet::bitcoin::Network;
+use bdk_wallet::Wallet;
+
+use bdk_sqlite::Store;
 use clap::Parser;
 use loon::db;
 use loon::Coordinator;
@@ -20,19 +19,17 @@ async fn main() -> cmd::Result<()> {
     let args = Args::parse();
 
     // Configure core rpc
-    //let url = "http://127.0.0.1:18443"; // regtest
     let url = "http://127.0.0.1:38332"; // signet
-    let user = env::var("RPC_USER")?;
-    let pass = env::var("RPC_PASS")?;
-    let auth = bitcoincore_rpc::Auth::UserPass(user, pass);
+    let cookie_file = env::var("RPC_COOKIE")?;
+    let auth = bitcoincore_rpc::Auth::CookieFile(cookie_file.into());
     let core = bitcoincore_rpc::Client::new(url, auth)?;
 
     // Configure db
     let db_path = "./loon.db";
-    let db = rusqlite::Connection::open(db_path).expect("db connect");
+    let db = rusqlite::Connection::open(db_path)?;
 
     // Configure nostr client
-    let nsec = Keys::from_sk_str(&env::var("NOSTR_NSEC").expect("keys from env"))?;
+    let nsec = Keys::parse(env::var("NOSTR_NSEC").expect("keys from env"))?;
     let opt = Options::new().wait_for_send(false).timeout(cmd::TIMEOUT);
     let client = Client::with_opts(&nsec, opt);
     client.add_relay("wss://relay.damus.io").await?;
@@ -70,9 +67,12 @@ async fn main() -> cmd::Result<()> {
     })?;
 
     // Load bdk store for the provided quorum
-    let store =
-        Store::<ChangeSet>::open_or_create_new(b"bdk-store", path::PathBuf::from("./wallet.db"))?;
-    let wallet = Wallet::new_or_load(&descriptor, None, store, Network::Signet)?;
+    let conn = bdk_sqlite::rusqlite::Connection::open("./wallet.db")?;
+    let mut store = Store::new(conn)?;
+    let changeset = store.read()?;
+    // FIXME
+    let change_desc = "wpkh(cVpPVruEDdmutPzisEsYvtST1usBR3ntr8pXSyt6D2YYqXRyPcFW)".to_string();
+    let wallet = Wallet::new_or_load(&descriptor, &change_desc, changeset, Network::Signet)?;
 
     // Create Coordinator
     let mut builder = Coordinator::builder(&nick, wallet);

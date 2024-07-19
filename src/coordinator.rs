@@ -1,14 +1,12 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use bdk::bitcoin::hashes::sha256;
-use bdk::bitcoin::hashes::Hash;
-use bdk::wallet::ChangeSet;
-use bdk_file_store::Store;
+use bdk_wallet::bitcoin::hashes::sha256;
+use bdk_wallet::bitcoin::hashes::Hash;
+use nostr_sdk::FromBech32;
 
 use super::nostr;
-use super::nostr::FromBech32;
-use super::nostr::XOnlyPublicKey;
+use super::nostr::NostrSigner;
 use crate::db;
 use crate::Error;
 
@@ -21,7 +19,7 @@ pub struct Coordinator {
     // account short name
     label: String,
     // bdk Wallet
-    wallet: bdk::Wallet<Store<ChangeSet>>,
+    wallet: bdk_wallet::Wallet,
     // relates quorum_id to a participant
     participants: BTreeMap<Pid, Participant>,
     // nostr client
@@ -34,7 +32,7 @@ impl Coordinator {
     /// Build a Coordinator from parts.
     ///
     /// See [`Builder`].
-    pub fn builder(label: &str, wallet: bdk::Wallet<Store<ChangeSet>>) -> Builder {
+    pub fn builder(label: &str, wallet: bdk_wallet::Wallet) -> Builder {
         let mut builder = Builder::default();
         builder.label(label).wallet(wallet);
         builder
@@ -56,12 +54,12 @@ impl Coordinator {
     }
 
     /// Get a reference to the `Wallet`.
-    pub fn wallet(&self) -> &bdk::Wallet<Store<ChangeSet>> {
+    pub fn wallet(&self) -> &bdk_wallet::Wallet {
         &self.wallet
     }
 
     /// Get a mutable reference to the `Wallet`.
-    pub fn wallet_mut(&mut self) -> &mut bdk::Wallet<Store<ChangeSet>> {
+    pub fn wallet_mut(&mut self) -> &mut bdk_wallet::Wallet {
         &mut self.wallet
     }
 
@@ -83,7 +81,7 @@ impl Coordinator {
     /// Get nostr keys.
     pub async fn keys(&self) -> Result<nostr::Keys, Error> {
         let signer = self.messenger.signer().await.map_err(Error::Nostr)?;
-        let nostr::ClientSigner::Keys(k) = signer else {
+        let NostrSigner::Keys(k) = signer else {
             return Err(Error::Coordinator("only Keys signers allowed".to_string()));
         };
         Ok(k)
@@ -96,8 +94,7 @@ impl Coordinator {
     pub fn quorum_fingerprint(&self) -> String {
         let desc = self
             .wallet
-            .public_descriptor(bdk::KeychainKind::External)
-            .expect("wallet descriptor");
+            .public_descriptor(bdk_wallet::KeychainKind::External);
         let hash = sha256::Hash::hash(desc.to_string().as_bytes());
         (hash.to_string()[..8]).to_string()
     }
@@ -116,7 +113,7 @@ impl Coordinator {
 #[derive(Debug, Default)]
 pub struct Builder {
     label: Option<String>,
-    wallet: Option<bdk::Wallet<Store<ChangeSet>>>,
+    wallet: Option<bdk_wallet::Wallet>,
     messenger: Option<nostr::Client>,
     oracle: Option<bitcoincore_rpc::Client>,
 }
@@ -129,7 +126,7 @@ impl Builder {
     }
 
     /// Setter for wallet.
-    fn wallet(&mut self, wallet: bdk::Wallet<Store<ChangeSet>>) -> &mut Self {
+    fn wallet(&mut self, wallet: bdk_wallet::Wallet) -> &mut Self {
         self.wallet = Some(wallet);
         self
     }
@@ -169,7 +166,7 @@ impl Builder {
 /// A participant in a quorum.
 #[derive(Debug)]
 pub struct Participant {
-    pub pk: XOnlyPublicKey,
+    pub pk: nostr_sdk::PublicKey,
     pub alias: Option<String>,
     pub account_id: u32,
     pub quorum_id: Pid,
@@ -177,7 +174,7 @@ pub struct Participant {
 
 impl From<db::Friend> for Participant {
     fn from(friend: db::Friend) -> Self {
-        let pk = XOnlyPublicKey::from_bech32(friend.npub).expect("must have valid npub");
+        let pk = nostr_sdk::PublicKey::from_bech32(friend.npub).expect("must have valid npub");
         Self {
             pk,
             alias: friend.alias,

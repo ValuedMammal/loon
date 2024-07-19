@@ -7,22 +7,12 @@ description = "Loon wallet - coordination at a distance"
 repository = "https://github.com/ValuedMammal/loon"
 keywords = ["bitcoin", "nostr"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1"
-bitcoincore-rpc = "0.17"
+bdk_wallet = "1.0.0-alpha.13"
+bdk_sqlite = "0.2.0"
+bitcoincore-rpc = "0.19"
 clap = { version = "4.4.8", features = ["derive"] }
-nostr-sdk = { version = "0.27" }
-rusqlite = "0.30"
+nostr-sdk = { version = "0.33" }
+rusqlite = "0.31"
 tokio = { version = "1", features = ["full"] }
-
-[dependencies.bdk]
-git = "https://github.com/bitcoindevkit/bdk"
-rev = "b5557dce70495adfd8e0951a35509f48724dfa81"
-#version = "1.0.0-alpha.8"
-
-[dependencies.bdk_file_store]
-git = "https://github.com/bitcoindevkit/bdk"
-rev = "b5557dce70495adfd8e0951a35509f48724dfa81"
-#version = "0.8.0"

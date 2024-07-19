@@ -52,10 +52,10 @@ mod test {
         // $ cargo run -- call -e -d -t 'chicken' -m 'hello world'
         // A -> B
         let m = "loon14795dc9101AuKpleIcx2+uVvC2SAIXndsGWRMQ8ISqMoUcmM2MfqAVDYiwjYv50mGgHOQxmLctGYoo0/GAqJTcC6HwSOCmvjmhqFFJa1tgYQ9F373eMr/Ds+p7IIKCdUWoZYMt0t6KdymO".to_string();
-        let k = Keys::from_sk_str(&std::env::var("NOSTR_NSEC_A").unwrap()).unwrap();
+        let k = Keys::parse(&std::env::var("NOSTR_NSEC_A").unwrap()).unwrap();
         let sk1 = k.secret_key().unwrap();
         let pk1 = k.public_key();
-        let k = Keys::from_sk_str(&std::env::var("NOSTR_NSEC_B").unwrap()).unwrap();
+        let k = Keys::parse(&std::env::var("NOSTR_NSEC_B").unwrap()).unwrap();
         let sk2 = k.secret_key().unwrap();
         let pk2 = k.public_key();
         let _conv = nip44::v2::ConversationKey::derive(&sk1, &pk2);

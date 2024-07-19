@@ -10,14 +10,14 @@ use loon::ChatEntry;
 use loon::Coordinator;
 
 use super::nostr::nip44;
-use super::nostr::{EventId, Filter, Kind, Timestamp, XOnlyPublicKey};
+use super::nostr::{EventId, Filter, Kind, PublicKey, Timestamp};
 use super::Result;
 
 /// How far to look back in time when polling the relay, currently one fortnight.
 const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
 /// Encrypted raw messages with author, keyed by `EventId`.
-type RawEntries = HashMap<EventId, (XOnlyPublicKey, String)>;
+type RawEntries = HashMap<EventId, (PublicKey, String)>;
 
 /// Fetch latest notes by quorum parties, printing results to stdout.
 pub async fn fetch_and_decrypt(coordinator: &Coordinator) -> Result<()> {
@@ -61,7 +61,7 @@ async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
 /// Decrypt nip44.
 async fn decrypt_raw_entries(
     coordinator: &Coordinator,
-    messages: impl IntoIterator<Item = (XOnlyPublicKey, String)>,
+    messages: impl IntoIterator<Item = (PublicKey, String)>,
 ) -> Result<Vec<ChatEntry>> {
     let k = coordinator.keys().await?;
     let my_sec = k.secret_key()?;
@@ -105,7 +105,7 @@ async fn decrypt_raw_entries(
                         "0" => CallTy::Nack,
                         "1" => CallTy::Ack,
                         _ => {
-                            let m = nip44::decrypt(&my_sec, &pk, payload)?;
+                            let m = nip44::decrypt(my_sec, &pk, payload)?;
                             CallTy::Note(m)
                         }
                     };

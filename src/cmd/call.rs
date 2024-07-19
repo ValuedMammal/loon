@@ -1,5 +1,6 @@
 use loon::CallTy;
 use loon::Coordinator;
+use nostr_sdk::hashes::hex::DisplayHex;
 
 use super::bail;
 use super::nostr::nip44;
@@ -15,8 +16,8 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
         CallSubCmd::Push { note } => {
             let client = coordinator.messenger();
             client.connect().await;
-            let event_id = client.publish_text_note(note, None).await?;
-            println!("Sent: {}", event_id);
+            let event = client.publish_text_note(note, None).await?;
+            println!("Sent: {}", event.id());
         }
         // Push an encrypted payload to a desginated recipient.
         CallSubCmd::New(params) => {
@@ -58,9 +59,9 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
                     };
 
                     // nip44 encrypt
-                    let my_sec = coordinator.keys().await?.secret_key()?;
+                    let my_sec = coordinator.keys().await?.secret_key()?.clone();
                     let conversation_key = nip44::v2::ConversationKey::derive(&my_sec, &p.pk);
-                    nip44::v2::encrypt(&conversation_key, note)?
+                    nip44::v2::encrypt_to_bytes(&conversation_key, note)?.to_upper_hex_string()
                 }
             };
 
@@ -72,8 +73,8 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             if params.dryrun {
                 println!("Preview: {:#?}", &call);
             } else {
-                let event_id = client.publish_text_note(call.to_string(), None).await?;
-                println!("Sent: {}", event_id);
+                let event = client.publish_text_note(call.to_string(), None).await?;
+                println!("Sent: {}", event.id());
             }
         }
     }
