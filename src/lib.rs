@@ -9,23 +9,32 @@ pub use {
     nostr_sdk::prelude as nostr,
 };
 
+/// Bdk wallet db path
+pub const WALLET_DB_PATH: &str = "./wallet.db";
+
 /// Crate errors.
 #[derive(Debug)]
 pub enum Error {
+    /// Bdk sqlite
+    BdkSqlite(bdk_sqlite::Error),
     /// Builder
     Builder,
     /// Coordinator
     Coordinator(String),
     /// Nostr client
     Nostr(nostr_sdk::client::Error),
+    /// Rusqlite
+    Rusqlite(rusqlite::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::BdkSqlite(e) => e.fmt(f),
             Self::Builder => write!(f, "not all required fields present"),
             Self::Coordinator(e) => e.fmt(f),
             Self::Nostr(e) => e.fmt(f),
+            Self::Rusqlite(e) => e.fmt(f),
         }
     }
 }

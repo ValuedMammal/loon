@@ -53,7 +53,10 @@ async fn main() -> cmd::Result<()> {
             cmd::bail!("no account found for that nick");
         }
     };
-    let descriptor = acct.descriptor;
+    let (desc, change_desc) = split_desc(&acct.descriptor);
+    if change_desc.is_empty() {
+        panic!("descriptor must be multipath");
+    }
 
     // Get friends from loon db
     let mut stmt = db.prepare("SELECT * FROM friend WHERE account_id = ?1")?;
@@ -70,9 +73,7 @@ async fn main() -> cmd::Result<()> {
     let conn = bdk_sqlite::rusqlite::Connection::open("./wallet.db")?;
     let mut store = Store::new(conn)?;
     let changeset = store.read()?;
-    // FIXME
-    let change_desc = "wpkh(cVpPVruEDdmutPzisEsYvtST1usBR3ntr8pXSyt6D2YYqXRyPcFW)".to_string();
-    let wallet = Wallet::new_or_load(&descriptor, &change_desc, changeset, Network::Signet)?;
+    let wallet = Wallet::new_or_load(&desc, &change_desc, changeset, Network::Signet)?;
 
     // Create Coordinator
     let mut builder = Coordinator::builder(&nick, wallet);
@@ -97,4 +98,38 @@ async fn main() -> cmd::Result<()> {
     }
 
     Ok(())
+}
+
+/// Split descriptor.
+#[allow(unused)]
+fn split_desc(desc: &str) -> (String, String) {
+    use regex_lite::Captures;
+    use regex_lite::Regex;
+    let re = Regex::new(r"<([\d+]);([\d+])>").unwrap();
+    if !re.is_match(&desc) {
+        return (desc.to_string(), String::new());
+    }
+
+    // we have a match
+    let caps = re.captures(&desc).unwrap();
+
+    // find, replace
+    let rep = |caps: &Captures| -> String { caps.get(1).unwrap().as_str().to_string() };
+    let descriptor = re.replace_all(&desc, &rep);
+    let rep = |caps: &Captures| -> String { caps.get(2).unwrap().as_str().to_string() };
+    let change_descriptor = re.replace_all(&desc, &rep);
+
+    (descriptor.to_string(), change_descriptor.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn split_descriptor() {
+        let desc = "wsh(multi(2,[7d94197e/84h/1h/0h]tpubDCmcN1ucMUfxxabEnLKHzUbjaxg8P4YR4V7mMsfhnsdRJquRyDTudrBmzZhrpV4Z4PH3MjKKFtBk6WkJbEWqL9Vc8E8v1tqFxtFXRY8zEjG/<0;1>/*,[9aa5b7ee/84h/1h/0h]tpubDCUB1aBPqtRaVXRpV6WT8RBKn6ZJhua9Uat8vvqfz2gD2zjSaGAasvKMsvcXHhCxrtv9T826vDpYRRhkU8DCRBxMd9Se3dzbScvcguWjcqF/<0;1>/*))";
+        let res = split_desc(desc);
+        dbg!(&res);
+    }
 }

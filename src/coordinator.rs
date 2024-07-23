@@ -9,6 +9,7 @@ use super::nostr;
 use super::nostr::NostrSigner;
 use crate::db;
 use crate::Error;
+use crate::WALLET_DB_PATH;
 
 /// Human-readable part of a loon call.
 pub const HRP: &str = "loon1";
@@ -106,6 +107,17 @@ impl Coordinator {
             .push(&recipient.to_string())
             .build(payload);
         call
+    }
+
+    /// Write changes to bdk database.
+    pub fn save_wallet_changes(&mut self) -> Result<(), Error> {
+        let conn = rusqlite::Connection::open(WALLET_DB_PATH).map_err(Error::Rusqlite)?;
+        let mut db = bdk_sqlite::Store::new(conn).map_err(Error::Rusqlite)?;
+        let wallet = self.wallet_mut();
+        if let Some(changes) = wallet.take_staged() {
+            db.write(&changes).map_err(Error::BdkSqlite)?;
+        }
+        Ok(())
     }
 }
 

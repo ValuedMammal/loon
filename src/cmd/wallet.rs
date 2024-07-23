@@ -42,6 +42,7 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                     .peek_address(KeychainKind::External, index)
             ),
         },
+
         // List wallet transactions
         WalletSubCmd::Transactions => {
             for canonical_tx in coordinator.wallet().transactions() {
@@ -60,6 +61,8 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
             println!("{}: {}", pid, p.alias.clone().unwrap_or("None".to_string()));
         }
     }
+
+    coordinator.save_wallet_changes()?;
 
     Ok(())
 }
