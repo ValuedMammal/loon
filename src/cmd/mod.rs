@@ -1,4 +1,5 @@
 pub mod call;
+pub mod db;
 pub mod descriptor;
 pub mod fetch;
 pub mod wallet;

@@ -34,13 +34,17 @@ async fn main() -> cmd::Result<()> {
     let client = Client::with_opts(&nsec, opt);
     client.add_relay("wss://relay.damus.io").await?;
 
-    // Get account nick from user
-    // TODO: handle case where `nick` is None, i.e. we want to create a new wallet.
-    let nick = args.nick.unwrap_or("test".to_string());
+    // Create new or get existing account
+    if let Cmd::Db(_) = args.cmd {
+        let _ = cmd::db::execute(&args.cmd);
+        return Ok(());
+    }
+
+    let acct_id = args.account_id.unwrap_or(1);
 
     // Get descriptors from loon db
-    let mut stmt = db.prepare("SELECT * FROM account WHERE nick = ?1")?;
-    let mut rows = stmt.query_map([&nick], |row| {
+    let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
+    let mut rows = stmt.query_map([&acct_id], |row| {
         Ok(db::Account {
             id: row.get(0)?,
             nick: row.get(1)?,
@@ -76,7 +80,7 @@ async fn main() -> cmd::Result<()> {
     let wallet = Wallet::new_or_load(&desc, &change_desc, changeset, Network::Signet)?;
 
     // Create Coordinator
-    let mut builder = Coordinator::builder(&nick, wallet);
+    let mut builder = Coordinator::builder(&acct.nick, wallet);
     builder.with_nostr(client).with_oracle(core);
     let mut coordinator = builder.build()?;
     for friend in friends {
@@ -85,6 +89,7 @@ async fn main() -> cmd::Result<()> {
     }
 
     match args.cmd {
+        Cmd::Db(_) => unreachable!("handled above"),
         Cmd::Desc(subcmd) => cmd::descriptor::execute(&coordinator, subcmd)?,
         Cmd::Call(subcmd) => cmd::call::push(&coordinator, subcmd).await?,
         Cmd::Fetch { listen } => {
@@ -101,23 +106,19 @@ async fn main() -> cmd::Result<()> {
 }
 
 /// Split descriptor.
-#[allow(unused)]
 fn split_desc(desc: &str) -> (String, String) {
     use regex_lite::Captures;
     use regex_lite::Regex;
     let re = Regex::new(r"<([\d+]);([\d+])>").unwrap();
-    if !re.is_match(&desc) {
+    if !re.is_match(desc) {
         return (desc.to_string(), String::new());
     }
 
-    // we have a match
-    let caps = re.captures(&desc).unwrap();
-
     // find, replace
     let rep = |caps: &Captures| -> String { caps.get(1).unwrap().as_str().to_string() };
-    let descriptor = re.replace_all(&desc, &rep).to_string();
+    let descriptor = re.replace_all(desc, &rep).to_string();
     let rep = |caps: &Captures| -> String { caps.get(2).unwrap().as_str().to_string() };
-    let change_descriptor = re.replace_all(&desc, &rep).to_string();
+    let change_descriptor = re.replace_all(desc, &rep).to_string();
 
     (descriptor, change_descriptor)
 }

@@ -4,9 +4,9 @@ use clap::Subcommand;
 #[derive(Parser)]
 #[clap(author, about)]
 pub struct Args {
-    /// Account nickname
-    #[clap(long, short = 'n')]
-    pub nick: Option<String>,
+    /// Account id
+    #[clap(long, short)]
+    pub account_id: Option<u32>,
     #[clap(subcommand)]
     pub cmd: Cmd,
 }
@@ -16,6 +16,9 @@ pub enum Cmd {
     /// Push notes.
     #[clap(subcommand)]
     Call(CallSubCmd),
+    /// Database operations.
+    #[clap(subcommand)]
+    Db(DbSubCmd),
     /// Descriptors operations.
     #[clap(subcommand)]
     Desc(DescSubCmd),
@@ -25,8 +28,6 @@ pub enum Cmd {
         #[clap(long, short = 'l')]
         listen: bool,
     },
-    // PSBT operations.
-    //Psbt,
     /// Wallet operations.
     #[clap(subcommand)]
     Wallet(WalletSubCmd),
@@ -82,15 +83,38 @@ pub enum DescSubCmd {
 }
 
 #[derive(Subcommand)]
+pub enum DbSubCmd {
+    /// Add new quorum account
+    Account {
+        /// Account nickname
+        #[arg(required = true)]
+        nick: String,
+        /// Descriptor
+        #[clap(required = true)]
+        descriptor: String,
+    },
+    /// Add new participant to existing quorum
+    Friend {
+        /// Account id
+        #[clap(required = true)]
+        account_id: u32,
+        /// Quorum id
+        #[clap(required = true)]
+        quid: u32,
+        /// Nostr npub
+        #[clap(required = true)]
+        npub: String,
+        /// Participant alias
+        #[clap(required = true)]
+        alias: String,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum WalletSubCmd {
     /// Address
     #[clap(subcommand)]
     Address(AddressSubCmd),
-    /// New
-    New {
-        #[clap(required = true)]
-        descriptor: String,
-    },
     /// Transactions
     Transactions,
     /// Display the alias for the current user.

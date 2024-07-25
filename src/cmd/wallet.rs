@@ -2,25 +2,12 @@ use bdk_wallet::KeychainKind;
 use loon::Coordinator;
 
 use super::Result;
-//use super::bail;
 use crate::cli::AddressSubCmd;
 use crate::cli::WalletSubCmd;
 
 // Perform wallet operations.
 pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()> {
     match subcmd {
-        // New
-        WalletSubCmd::New { descriptor } => {
-            let _desc = descriptor;
-            // create bdk wallet
-
-            // parse friends from desc
-
-            // set a nick
-            // write to loon.db
-            // stmt: insert into account ..
-            // stmt: insert into friend ..
-        }
         // Address
         WalletSubCmd::Address(cmd) => match cmd {
             AddressSubCmd::New => println!(
