@@ -115,11 +115,11 @@ fn split_desc(desc: &str) -> (String, String) {
 
     // find, replace
     let rep = |caps: &Captures| -> String { caps.get(1).unwrap().as_str().to_string() };
-    let descriptor = re.replace_all(&desc, &rep);
+    let descriptor = re.replace_all(&desc, &rep).to_string();
     let rep = |caps: &Captures| -> String { caps.get(2).unwrap().as_str().to_string() };
-    let change_descriptor = re.replace_all(&desc, &rep);
+    let change_descriptor = re.replace_all(&desc, &rep).to_string();
 
-    (descriptor.to_string(), change_descriptor.to_string())
+    (descriptor, change_descriptor)
 }
 
 #[cfg(test)]
@@ -129,7 +129,13 @@ mod test {
     #[test]
     fn split_descriptor() {
         let desc = "wsh(multi(2,[7d94197e/84h/1h/0h]tpubDCmcN1ucMUfxxabEnLKHzUbjaxg8P4YR4V7mMsfhnsdRJquRyDTudrBmzZhrpV4Z4PH3MjKKFtBk6WkJbEWqL9Vc8E8v1tqFxtFXRY8zEjG/<0;1>/*,[9aa5b7ee/84h/1h/0h]tpubDCUB1aBPqtRaVXRpV6WT8RBKn6ZJhua9Uat8vvqfz2gD2zjSaGAasvKMsvcXHhCxrtv9T826vDpYRRhkU8DCRBxMd9Se3dzbScvcguWjcqF/<0;1>/*))";
-        let res = split_desc(desc);
-        dbg!(&res);
+        let (desc, change_desc) = split_desc(desc);
+        assert!(!change_desc.is_empty());
+        for s in [desc, change_desc] {
+            assert!(!s.is_empty());
+            assert!(!s.contains(";"));
+            assert!(!s.contains("<"));
+            assert!(!s.contains(">"));
+        }
     }
 }
