@@ -6,7 +6,7 @@ use crate::cli::DbSubCmd;
 /// Execute database operation.
 pub fn execute(cmd: &Cmd) -> anyhow::Result<()> {
     if let Cmd::Db(cmd) = cmd {
-        let db = rusqlite::Connection::open("./loon.db")?;
+        let db = rusqlite::Connection::open(loon::DB_PATH)?;
 
         match cmd {
             // Insert into account

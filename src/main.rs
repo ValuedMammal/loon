@@ -1,12 +1,11 @@
 use std::env;
 
 use bdk_wallet::bitcoin::Network;
-use bdk_wallet::Wallet;
-
-use bdk_sqlite::Store;
 use clap::Parser;
 use loon::db;
 use loon::Coordinator;
+use loon::BDK_DB_PATH;
+use loon::DB_PATH;
 use nostr_sdk::prelude::*;
 
 mod cli;
@@ -25,8 +24,7 @@ async fn main() -> cmd::Result<()> {
     let core = bitcoincore_rpc::Client::new(url, auth)?;
 
     // Configure db
-    let db_path = "./loon.db";
-    let db = rusqlite::Connection::open(db_path)?;
+    let db = rusqlite::Connection::open(DB_PATH)?;
 
     // Configure nostr client
     let nsec = Keys::parse(env::var("NOSTR_NSEC").expect("keys from env"))?;
@@ -74,10 +72,13 @@ async fn main() -> cmd::Result<()> {
     })?;
 
     // Load bdk store for the provided quorum
-    let conn = bdk_sqlite::rusqlite::Connection::open("./wallet.db")?;
-    let mut store = Store::new(conn)?;
-    let changeset = store.read()?;
-    let wallet = Wallet::new_or_load(&desc, &change_desc, changeset, Network::Signet)?;
+    let mut conn = rusqlite::Connection::open(BDK_DB_PATH)?;
+    let wallet = match bdk_wallet::LoadParams::new().load_wallet(&mut conn)? {
+        Some(wallet) => wallet,
+        None => bdk_wallet::CreateParams::new(desc, change_desc)
+            .network(Network::Signet)
+            .create_wallet(&mut conn)?,
+    };
 
     // Create Coordinator
     let mut builder = Coordinator::builder(&acct.nick, wallet);

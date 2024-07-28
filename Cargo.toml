@@ -9,8 +9,7 @@ keywords = ["bitcoin", "nostr"]
 
 [dependencies]
 anyhow = "1"
-bdk_wallet = "1.0.0-alpha.13"
-bdk_sqlite = "0.2.0"
+bdk_wallet = { version = "1.0.0-beta.1", features = ["rusqlite"] }
 bitcoincore-rpc = "0.19"
 clap = { version = "4.4.8", features = ["derive"] }
 nostr-sdk = { version = "0.33" }

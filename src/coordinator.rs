@@ -7,9 +7,10 @@ use nostr_sdk::FromBech32;
 
 use super::nostr;
 use super::nostr::NostrSigner;
+use super::Wallet;
 use crate::db;
 use crate::Error;
-use crate::WALLET_DB_PATH;
+use crate::BDK_DB_PATH;
 
 /// Human-readable part of a loon call.
 pub const HRP: &str = "loon1";
@@ -20,7 +21,7 @@ pub struct Coordinator {
     // account short name
     label: String,
     // bdk Wallet
-    wallet: bdk_wallet::Wallet,
+    wallet: Wallet,
     // relates quorum_id to a participant
     participants: BTreeMap<Pid, Participant>,
     // nostr client
@@ -33,7 +34,7 @@ impl Coordinator {
     /// Build a Coordinator from parts.
     ///
     /// See [`Builder`].
-    pub fn builder(label: &str, wallet: bdk_wallet::Wallet) -> Builder {
+    pub fn builder(label: &str, wallet: Wallet) -> Builder {
         let mut builder = Builder::default();
         builder.label(label).wallet(wallet);
         builder
@@ -55,12 +56,12 @@ impl Coordinator {
     }
 
     /// Get a reference to the `Wallet`.
-    pub fn wallet(&self) -> &bdk_wallet::Wallet {
+    pub fn wallet(&self) -> &Wallet {
         &self.wallet
     }
 
     /// Get a mutable reference to the `Wallet`.
-    pub fn wallet_mut(&mut self) -> &mut bdk_wallet::Wallet {
+    pub fn wallet_mut(&mut self) -> &mut Wallet {
         &mut self.wallet
     }
 
@@ -111,12 +112,8 @@ impl Coordinator {
 
     /// Write changes to bdk database.
     pub fn save_wallet_changes(&mut self) -> Result<(), Error> {
-        let conn = rusqlite::Connection::open(WALLET_DB_PATH).map_err(Error::Rusqlite)?;
-        let mut db = bdk_sqlite::Store::new(conn).map_err(Error::Rusqlite)?;
-        let wallet = self.wallet_mut();
-        if let Some(changes) = wallet.take_staged() {
-            db.write(&changes).map_err(Error::BdkSqlite)?;
-        }
+        let mut conn = rusqlite::Connection::open(BDK_DB_PATH).map_err(Error::Rusqlite)?;
+        self.wallet.persist(&mut conn).map_err(Error::Rusqlite)?;
         Ok(())
     }
 }
@@ -125,7 +122,7 @@ impl Coordinator {
 #[derive(Debug, Default)]
 pub struct Builder {
     label: Option<String>,
-    wallet: Option<bdk_wallet::Wallet>,
+    wallet: Option<Wallet>,
     messenger: Option<nostr::Client>,
     oracle: Option<bitcoincore_rpc::Client>,
 }
@@ -138,7 +135,7 @@ impl Builder {
     }
 
     /// Setter for wallet.
-    fn wallet(&mut self, wallet: bdk_wallet::Wallet) -> &mut Self {
+    fn wallet(&mut self, wallet: Wallet) -> &mut Self {
         self.wallet = Some(wallet);
         self
     }
