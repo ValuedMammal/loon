@@ -3,10 +3,10 @@ use std::env;
 use bdk_wallet::bitcoin::Network;
 use clap::Parser;
 use loon::db;
+use loon::nostr::*;
 use loon::Coordinator;
 use loon::BDK_DB_PATH;
 use loon::DB_PATH;
-use nostr_sdk::prelude::*;
 
 mod cli;
 mod cmd;
@@ -32,10 +32,19 @@ async fn main() -> cmd::Result<()> {
     let client = Client::with_opts(&nsec, opt);
     client.add_relay("wss://relay.damus.io").await?;
 
-    // Create new or get existing account
-    if let Cmd::Db(_) = args.cmd {
-        let _ = cmd::db::execute(&args.cmd);
-        return Ok(());
+    // Handle db command or generate nostr keys
+    match args.cmd {
+        Cmd::Db(_) => {
+            cmd::db::execute(&args.cmd)?;
+            return Ok(());
+        }
+        Cmd::Keys => {
+            let keys = Keys::generate();
+            println!("{}", keys.public_key().to_bech32()?);
+            println!("{}", keys.secret_key()?.to_bech32()?);
+            return Ok(());
+        }
+        _ => {}
     }
 
     let acct_id = args.account_id.unwrap_or(1);
@@ -100,6 +109,7 @@ async fn main() -> cmd::Result<()> {
                 cmd::fetch::fetch_and_decrypt(&coordinator).await?;
             }
         }
+        Cmd::Keys => unreachable!("handled above"),
         Cmd::Wallet(subcmd) => cmd::wallet::execute(&mut coordinator, subcmd).await?,
     }
 

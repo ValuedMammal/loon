@@ -28,6 +28,8 @@ pub enum Cmd {
         #[clap(long, short = 'l')]
         listen: bool,
     },
+    /// Generate new nostr keys.
+    Keys,
     /// Wallet operations.
     #[clap(subcommand)]
     Wallet(WalletSubCmd),
