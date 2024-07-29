@@ -2,6 +2,7 @@ pub mod call;
 pub mod db;
 pub mod descriptor;
 pub mod fetch;
+pub mod rpc_client;
 pub mod wallet;
 
 pub use nostr_sdk::prelude as nostr;

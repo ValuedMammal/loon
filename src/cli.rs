@@ -30,6 +30,8 @@ pub enum Cmd {
     },
     /// Generate new nostr keys.
     Keys,
+    /// Sync
+    Sync,
     /// Wallet operations.
     #[clap(subcommand)]
     Wallet(WalletSubCmd),
