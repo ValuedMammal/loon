@@ -99,6 +99,7 @@ async fn main() -> cmd::Result<()> {
     }
 
     match args.cmd {
+        Cmd::Sync => cmd::rpc_client::filter_scan(coordinator)?,
         Cmd::Db(_) => unreachable!("handled above"),
         Cmd::Desc(subcmd) => cmd::descriptor::execute(&coordinator, subcmd)?,
         Cmd::Call(subcmd) => cmd::call::push(&coordinator, subcmd).await?,
