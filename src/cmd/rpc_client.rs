@@ -1,5 +1,8 @@
 use bdk_bitcoind_rpc::compact_filter;
-use bdk_wallet::KeychainKind;
+use bdk_wallet::{
+    bitcoin::{Address, Network},
+    KeychainKind,
+};
 use loon::Coordinator;
 
 use super::Result;
@@ -8,10 +11,13 @@ use super::Result;
 pub fn filter_scan(mut coordinator: Coordinator) -> Result<()> {
     let mut req =
         compact_filter::Request::<KeychainKind>::new(coordinator.wallet().latest_checkpoint());
+
     for (keychain, desc) in coordinator.wallet().spk_index().keychains() {
         req.add_descriptor(keychain, desc.clone(), 0..10);
     }
+
     let mut client = req.build_client(coordinator.chain());
+
     let compact_filter::Update {
         tip,
         indexed_tx_graph,
@@ -25,10 +31,17 @@ pub fn filter_scan(mut coordinator: Coordinator) -> Result<()> {
 
     coordinator.save_wallet_changes()?;
 
-    println!("{:?}", coordinator.wallet().balance());
-    for tx in coordinator.wallet().transactions() {
-        dbg!(tx.tx_node.txid);
+    let unspent: Vec<_> = coordinator.wallet().list_unspent().collect();
+    for utxo in unspent {
+        println!(
+            "{} | {} | {}",
+            Address::from_script(&utxo.txout.script_pubkey, Network::Signet)?,
+            utxo.txout.value.display_dynamic(),
+            utxo.outpoint,
+        );
     }
+
+    println!("{:#?}", coordinator.wallet().balance());
 
     Ok(())
 }
