@@ -9,8 +9,8 @@ keywords = ["bitcoin", "nostr"]
 
 [dependencies]
 anyhow = "1"
-bdk_wallet = { path = "../bdk/crates/wallet", version = "1.0.0-beta.1", features = ["rusqlite"] }
-bdk_bitcoind_rpc = { path = "../bdk/crates/bitcoind_rpc" }
+bdk_wallet = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/bitcoind-rpc-filter", features = ["rusqlite"] }
+bdk_bitcoind_rpc = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/bitcoind-rpc-filter" }
 bitcoincore-rpc = "0.19"
 clap = { version = "4.4.8", features = ["derive"] }
 nostr-sdk = { version = "0.33" }
