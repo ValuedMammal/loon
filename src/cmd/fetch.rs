@@ -105,11 +105,10 @@ async fn decrypt_raw_entries(
                         "0" => CallTy::Nack,
                         "1" => CallTy::Ack,
                         _ => {
-                            let m = nip44::decrypt(my_sec, &pk, payload)?;
-                            CallTy::Note(m)
+                            let decoded = nip44::decrypt(my_sec, &pk, payload)?;
+                            CallTy::Note(decoded)
                         }
                     };
-
                     ret.push(ChatEntry {
                         alias,
                         message: res.to_string(),

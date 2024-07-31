@@ -1,6 +1,5 @@
 use loon::CallTy;
 use loon::Coordinator;
-use nostr_sdk::hashes::hex::DisplayHex;
 
 use super::bail;
 use super::nostr::nip44;
@@ -60,8 +59,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
 
                     // nip44 encrypt
                     let my_sec = coordinator.keys().await?.secret_key()?.clone();
-                    let conversation_key = nip44::v2::ConversationKey::derive(&my_sec, &p.pk);
-                    nip44::v2::encrypt_to_bytes(&conversation_key, note)?.to_upper_hex_string()
+                    nip44::encrypt(&my_sec, &p.pk, note, nip44::Version::V2)?
                 }
             };
 

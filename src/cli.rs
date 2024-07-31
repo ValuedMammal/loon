@@ -120,7 +120,8 @@ pub enum WalletSubCmd {
     #[clap(subcommand)]
     Address(AddressSubCmd),
     /// Transactions
-    Transactions,
+    #[clap(subcommand)]
+    Tx(TxSubCmd),
     /// Display the alias for the current user.
     Whoami,
 }
@@ -137,6 +138,24 @@ pub enum AddressSubCmd {
         #[clap(required = true)]
         index: u32,
     },
+}
+
+#[derive(Subcommand)]
+pub enum TxSubCmd {
+    /// Create new
+    New {
+        /// Recipient address
+        #[clap(required = true)]
+        recipient: String,
+        /// Amount
+        #[clap(required = true)]
+        amount: u64,
+        /// Feerate (sat/vb)
+        #[clap(long, short)]
+        feerate: f64,
+    },
+    /// List transactions
+    List,
 }
 
 #[derive(Parser)]
