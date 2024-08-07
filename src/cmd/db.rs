@@ -1,5 +1,5 @@
-use rusqlite::named_params;
-
+use super::rusqlite;
+use super::rusqlite::named_params;
 use crate::cli::Cmd;
 use crate::cli::DbSubCmd;
 

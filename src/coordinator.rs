@@ -7,6 +7,7 @@ use nostr_sdk::FromBech32;
 
 use super::nostr;
 use super::nostr::NostrSigner;
+use super::rusqlite;
 use super::Wallet;
 use crate::db;
 use crate::Error;

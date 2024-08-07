@@ -5,6 +5,7 @@ pub mod fetch;
 pub mod rpc_client;
 pub mod wallet;
 
+pub use loon::rusqlite;
 pub use nostr_sdk::prelude as nostr;
 
 pub use anyhow::bail;

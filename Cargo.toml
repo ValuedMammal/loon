@@ -14,6 +14,5 @@ bdk_bitcoind_rpc = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/
 bitcoincore-rpc = "0.19"
 clap = { version = "4.4.8", features = ["derive"] }
 nostr-sdk = { version = "0.33" }
-rusqlite = "0.31"
 tokio = { version = "1", features = ["full"] }
 regex-lite = "0.1.6"

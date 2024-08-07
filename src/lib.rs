@@ -4,6 +4,7 @@ mod coordinator;
 pub mod db;
 
 pub use {
+    bdk_wallet::rusqlite,
     // Re-exports
     coordinator::{Call, CallTy, Coordinator, Participant, HRP},
     nostr_sdk::prelude as nostr,

@@ -4,6 +4,7 @@ use bdk_wallet::bitcoin::Network;
 use clap::Parser;
 use loon::db;
 use loon::nostr::*;
+use loon::rusqlite;
 use loon::Coordinator;
 use loon::BDK_DB_PATH;
 use loon::DB_PATH;
