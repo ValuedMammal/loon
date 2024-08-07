@@ -60,6 +60,7 @@ mod test {
     use nostr_sdk::prelude::*;
 
     #[test]
+    #[ignore = "requires locally set env vars"]
     fn encode_decode() {
         // call --encrypt --dryrun --to <recipient> --note <content>
         // $ cargo run -- call -e -d -t 'chicken' -m 'hello world'
