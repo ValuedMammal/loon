@@ -5,6 +5,7 @@ use bdk_wallet::bitcoin::hashes::sha256;
 use bdk_wallet::bitcoin::hashes::Hash;
 use nostr_sdk::FromBech32;
 
+use super::bitcoincore_rpc;
 use super::nostr;
 use super::nostr::NostrSigner;
 use super::rusqlite;

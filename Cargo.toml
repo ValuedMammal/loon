@@ -11,7 +11,6 @@ keywords = ["bitcoin", "nostr"]
 anyhow = "1"
 bdk_wallet = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/bitcoind-rpc-filter", features = ["rusqlite"] }
 bdk_bitcoind_rpc = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/bitcoind-rpc-filter" }
-bitcoincore-rpc = "0.19"
 clap = { version = "4.4.8", features = ["derive"] }
 nostr-sdk = { version = "0.33" }
 tokio = { version = "1", features = ["full"] }

@@ -1,6 +1,7 @@
-use bitcoincore_rpc::bitcoincore_rpc_json;
-use bitcoincore_rpc::bitcoincore_rpc_json::ImportDescriptors;
-use bitcoincore_rpc::RpcApi;
+use loon::bitcoincore_rpc::{
+    bitcoincore_rpc_json::{self, ImportDescriptors},
+    RpcApi,
+};
 use loon::Coordinator;
 
 use crate::cli::DescSubCmd;
