@@ -7,7 +7,7 @@ use crate::cli::DescSubCmd;
 
 // Core RPCs related to descriptors, useful for quick debugging
 pub fn execute(coordinator: &Coordinator, subcmd: DescSubCmd) -> super::Result<()> {
-    let client = coordinator.chain();
+    let client = coordinator.rpc_client();
 
     match subcmd {
         DescSubCmd::Import { desc, internal } => {

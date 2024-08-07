@@ -28,7 +28,7 @@ pub struct Coordinator {
     // nostr client
     messenger: nostr::Client,
     // source of chain data
-    oracle: bitcoincore_rpc::Client,
+    rpc_client: bitcoincore_rpc::Client,
 }
 
 impl Coordinator {
@@ -41,7 +41,7 @@ impl Coordinator {
         builder
     }
 
-    /// Insert a participant.
+    /// Insert a `Participant`.
     pub fn insert(&mut self, pid: impl Into<Pid>, participant: impl Into<Participant>) {
         self.participants.insert(pid.into(), participant.into());
     }
@@ -76,9 +76,9 @@ impl Coordinator {
         &self.messenger
     }
 
-    /// Get a reference to the chain backend.
-    pub fn chain(&self) -> &bitcoincore_rpc::Client {
-        &self.oracle
+    /// Get a reference to the blockchain RPC client.
+    pub fn rpc_client(&self) -> &bitcoincore_rpc::Client {
+        &self.rpc_client
     }
 
     /// Get nostr keys.
@@ -125,7 +125,7 @@ pub struct Builder {
     label: Option<String>,
     wallet: Option<Wallet>,
     messenger: Option<nostr::Client>,
-    oracle: Option<bitcoincore_rpc::Client>,
+    rpc_client: Option<bitcoincore_rpc::Client>,
 }
 
 impl Builder {
@@ -142,14 +142,14 @@ impl Builder {
     }
 
     /// Setter for nostr client.
-    pub fn with_nostr(&mut self, client: nostr::Client) -> &mut Self {
+    pub fn with_nostr_client(&mut self, client: nostr::Client) -> &mut Self {
         self.messenger = Some(client);
         self
     }
 
-    /// Setter for chain oracle.
-    pub fn with_oracle(&mut self, client: bitcoincore_rpc::Client) -> &mut Self {
-        self.oracle = Some(client);
+    /// Setter for RPC client.
+    pub fn with_rpc_client(&mut self, client: bitcoincore_rpc::Client) -> &mut Self {
+        self.rpc_client = Some(client);
         self
     }
 
@@ -158,7 +158,7 @@ impl Builder {
         if self.label.is_none()
             || self.wallet.is_none()
             || self.messenger.is_none()
-            || self.oracle.is_none()
+            || self.rpc_client.is_none()
         {
             return Err(Error::Builder);
         }
@@ -168,7 +168,7 @@ impl Builder {
             wallet: self.wallet.unwrap(),
             participants: BTreeMap::new(),
             messenger: self.messenger.unwrap(),
-            oracle: self.oracle.unwrap(),
+            rpc_client: self.rpc_client.unwrap(),
         })
     }
 }

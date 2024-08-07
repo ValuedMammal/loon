@@ -16,7 +16,7 @@ pub fn filter_scan(mut coordinator: Coordinator) -> Result<()> {
         req.add_descriptor(keychain, desc.clone(), 0..10);
     }
 
-    let mut client = req.build_client(coordinator.chain());
+    let mut client = req.build_client(coordinator.rpc_client());
 
     let compact_filter::Update {
         tip,

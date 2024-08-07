@@ -92,7 +92,7 @@ async fn main() -> cmd::Result<()> {
 
     // Create Coordinator
     let mut builder = Coordinator::builder(&acct.nick, wallet);
-    builder.with_nostr(client).with_oracle(core);
+    builder.with_nostr_client(client).with_rpc_client(core);
     let mut coordinator = builder.build()?;
     for friend in friends {
         let f = friend?;
