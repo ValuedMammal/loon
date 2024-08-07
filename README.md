@@ -8,14 +8,37 @@ Coordination at a distance
 
 
 ## Quick Start
-(coming soon)
+The app uses BDK, nostr-sdk, clap, and tokio. Right now it's a simple CLI made for individual power users and not necessarily for mass consumption. Note carefully the following requirements.
 
-## TODO  
+### Requirements
+- A local bitcoind configured with `-blockfilterindex` and `-peerblockfilters`
+- These environment variables must be set
+    - `RPC_COOKIE` - path to bitcoind cookie file for communicating over RPC, e.g. `/home/satoshi/.bitcoin/signet/.cookie`
+    - `NOSTR_NSEC` - to sign/publish nostr events
+- Sqlite data store, i.e. `loon.db`. See the [schema](./schema.sql).
+
+### Limitations
+We currently hardcode the bitcoin network to Signet for testing purposes, but this should change in the future.
+
+We use [a fork of BDK](https://github.com/ValuedMammal/bdk/tree/feat/bitcoind-rpc-filter) that supports compact block filter (CBF) sync via Bitcoin Core RPC. While multiple efforts are underway for BDK to officially support CBF, it's not certain whether the implementation used in Loon will ever be officially adopted/merged.
+
+## Features
 |Status|Task|
 |:----:|--------|
-|✅ | Finalize [v1 spec](./doc/specification.md) (in progress) |
+|✅ | Finalize [v1 spec](./doc/specification.md) |
 |_ | Demo user flow |
-|✅ | Implement `listen` cmd |
-|_ | Sync! |
-|_ | Use multipath descriptors |
 |_ | Design a policy/quorum builder |
+|✅ | Get descriptor info |
+|✅ | Import descriptors |
+|✅ | Emit SQL via CLI |
+|✅ | Publish notes |
+|✅ | Fetch notes from quorum participants |
+|✅ | nip44 encrypt/decrypt |
+|✅ | Generate nostr keys |
+|✅ | Use multipath descriptors |
+|✅ | Wallet sync |
+|✅ | Get addresses |
+|✅ | Create PSBTs |
+|✅ | List wallet transactions |
+|_ | Make network configurable |
+|_ | Send raw transaction |
