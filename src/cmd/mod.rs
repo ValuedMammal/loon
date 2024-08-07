@@ -2,13 +2,13 @@ pub mod call;
 pub mod db;
 pub mod descriptor;
 pub mod fetch;
-pub mod rpc_client;
 pub mod wallet;
 
 pub use loon::rusqlite;
 pub use nostr_sdk::prelude as nostr;
 
 pub use anyhow::bail;
+pub use anyhow::Context;
 pub use anyhow::Result;
 
 /// App default nostr client timeout

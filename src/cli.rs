@@ -30,8 +30,6 @@ pub enum Cmd {
     },
     /// Generate new nostr keys.
     Keys,
-    /// Sync
-    Sync,
     /// Wallet operations.
     #[clap(subcommand)]
     Wallet(WalletSubCmd),
@@ -119,6 +117,8 @@ pub enum WalletSubCmd {
     /// Address
     #[clap(subcommand)]
     Address(AddressSubCmd),
+    /// Sync with blockchain
+    Sync,
     /// Transactions
     #[clap(subcommand)]
     Tx(TxSubCmd),

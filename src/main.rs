@@ -9,10 +9,11 @@ use loon::Coordinator;
 use loon::BDK_DB_PATH;
 use loon::DB_PATH;
 
+use cli::{Args, Cmd};
+use cmd::Context;
+
 mod cli;
 mod cmd;
-
-use cli::{Args, Cmd};
 
 #[tokio::main]
 async fn main() -> cmd::Result<()> {
@@ -20,7 +21,7 @@ async fn main() -> cmd::Result<()> {
 
     // Configure core rpc
     let url = "http://127.0.0.1:38332"; // signet
-    let cookie_file = env::var("RPC_COOKIE")?;
+    let cookie_file = env::var("RPC_COOKIE").context("must set RPC_COOKIE")?;
     let auth = bitcoincore_rpc::Auth::CookieFile(cookie_file.into());
     let core = bitcoincore_rpc::Client::new(url, auth)?;
 
@@ -28,7 +29,7 @@ async fn main() -> cmd::Result<()> {
     let db = rusqlite::Connection::open(DB_PATH)?;
 
     // Configure nostr client
-    let nsec = Keys::parse(env::var("NOSTR_NSEC").expect("keys from env"))?;
+    let nsec = Keys::parse(env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
     let opt = Options::new().wait_for_send(false).timeout(cmd::TIMEOUT);
     let client = Client::with_opts(&nsec, opt);
     client.add_relay("wss://relay.damus.io").await?;
@@ -100,7 +101,6 @@ async fn main() -> cmd::Result<()> {
     }
 
     match args.cmd {
-        Cmd::Sync => cmd::rpc_client::filter_scan(coordinator)?,
         Cmd::Db(_) => unreachable!("handled above"),
         Cmd::Desc(subcmd) => cmd::descriptor::execute(&coordinator, subcmd)?,
         Cmd::Call(subcmd) => cmd::call::push(&coordinator, subcmd).await?,
