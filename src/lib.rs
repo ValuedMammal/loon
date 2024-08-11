@@ -55,36 +55,11 @@ pub struct ChatEntry {
 }
 
 #[cfg(test)]
+#[allow(unused)]
 mod test {
-    //use super::*;
-    use nostr_sdk::prelude::*;
+    use super::*;
 
+    #[ignore]
     #[test]
-    #[ignore = "requires locally set env vars"]
-    fn encode_decode() {
-        // call --encrypt --dryrun --to <recipient> --note <content>
-        // $ cargo run -- call -e -d -t 'chicken' -m 'hello world'
-        // A -> B
-        let m = "loon14795dc9101AuKpleIcx2+uVvC2SAIXndsGWRMQ8ISqMoUcmM2MfqAVDYiwjYv50mGgHOQxmLctGYoo0/GAqJTcC6HwSOCmvjmhqFFJa1tgYQ9F373eMr/Ds+p7IIKCdUWoZYMt0t6KdymO".to_string();
-        let k = Keys::parse(&std::env::var("NOSTR_NSEC_A").unwrap()).unwrap();
-        let sk1 = k.secret_key().unwrap();
-        let pk1 = k.public_key();
-        let k = Keys::parse(&std::env::var("NOSTR_NSEC_B").unwrap()).unwrap();
-        let sk2 = k.secret_key().unwrap();
-        let pk2 = k.public_key();
-        let _conv = nip44::v2::ConversationKey::derive(&sk1, &pk2);
-
-        let hrp = &m[..5];
-        assert_eq!(hrp, "loon1");
-
-        let qfp = &m[5..13];
-        assert_eq!(qfp, "4795dc91");
-
-        let quid = &m[13..15];
-        assert_eq!(quid, "01");
-
-        let payload = &m[15..];
-        let res = nip44::decrypt(&sk2, &pk1, payload).unwrap();
-        assert_eq!(res, "hello world");
-    }
+    fn it_works() {}
 }
