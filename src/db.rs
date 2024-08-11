@@ -2,6 +2,7 @@
 #[derive(Debug)]
 pub struct Account {
     pub id: u32,
+    pub network: String,
     pub nick: String,
     pub descriptor: String,
 }

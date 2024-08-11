@@ -20,21 +20,6 @@ mod cmd;
 async fn main() -> cmd::Result<()> {
     let args = Args::parse();
 
-    // Configure core rpc
-    let url = "http://127.0.0.1:38332"; // signet
-    let cookie_file = env::var("RPC_COOKIE").context("must set RPC_COOKIE")?;
-    let auth = bitcoincore_rpc::Auth::CookieFile(cookie_file.into());
-    let core = bitcoincore_rpc::Client::new(url, auth)?;
-
-    // Configure db
-    let db = rusqlite::Connection::open(DB_PATH)?;
-
-    // Configure nostr client
-    let nsec = Keys::parse(env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
-    let opt = Options::new().wait_for_send(false).timeout(cmd::TIMEOUT);
-    let client = Client::with_opts(&nsec, opt);
-    client.add_relay("wss://relay.damus.io").await?;
-
     // Handle db command or generate nostr keys
     match args.cmd {
         Cmd::Db(_) => {
@@ -50,27 +35,36 @@ async fn main() -> cmd::Result<()> {
         _ => {}
     }
 
-    let acct_id = args.account_id.unwrap_or(1);
-
     // Get descriptors from loon db
+    let acct_id = args.account_id.unwrap_or(1);
+    let db = rusqlite::Connection::open(DB_PATH)?;
+
     let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
     let mut rows = stmt.query_map([&acct_id], |row| {
         Ok(db::Account {
             id: row.get(0)?,
-            nick: row.get(1)?,
-            descriptor: row.get(2)?,
+            network: row.get(1)?,
+            nick: row.get(2)?,
+            descriptor: row.get(3)?,
         })
     })?;
     let acct = match rows.next() {
         Some(acct) => acct?,
         None => {
-            cmd::bail!("no account found for that nick");
+            cmd::bail!("no account found for that acct id");
         }
     };
+
     let (desc, change_desc) = split_desc(&acct.descriptor);
     if change_desc.is_empty() {
-        panic!("descriptor must be multipath");
+        cmd::bail!("descriptor must be multipath");
     }
+
+    let (network, rpc_port) = match acct.network.as_str() {
+        "signet" => (Network::Signet, 38332),
+        "bitcoin" => (Network::Bitcoin, 8332),
+        _ => cmd::bail!("unsupported network"),
+    };
 
     // Get friends from loon db
     let mut stmt = db.prepare("SELECT * FROM friend WHERE account_id = ?1")?;
@@ -88,17 +82,32 @@ async fn main() -> cmd::Result<()> {
     let wallet = match bdk_wallet::LoadParams::new().load_wallet(&mut conn)? {
         Some(wallet) => wallet,
         None => bdk_wallet::CreateParams::new(desc, change_desc)
-            .network(Network::Signet)
+            .network(network)
             .create_wallet(&mut conn)?,
     };
 
+    // Configure core rpc
+    let url = format!("http://127.0.0.1:{rpc_port}");
+    let cookie_file = env::var("RPC_COOKIE").context("must set RPC_COOKIE")?;
+    let auth = bitcoincore_rpc::Auth::CookieFile(cookie_file.into());
+    let core = bitcoincore_rpc::Client::new(&url, auth)?;
+
+    // Configure nostr client
+    let nsec = Keys::parse(env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
+    let opt = Options::new().wait_for_send(false).timeout(cmd::TIMEOUT);
+    let client = Client::with_opts(&nsec, opt);
+    client.add_relay("wss://relay.damus.io").await?;
+
     // Create Coordinator
-    let mut builder = Coordinator::builder(&acct.nick, wallet);
-    builder.with_nostr_client(client).with_rpc_client(core);
-    let mut coordinator = builder.build()?;
+    let mut coordinator = Coordinator::builder()
+        .wallet(wallet)
+        .rpc_client(core)
+        .nostr_client(client)
+        .build()?;
+
     for friend in friends {
         let f = friend?;
-        coordinator.insert(f.quorum_id, f);
+        coordinator.add_participant(f.quorum_id, f);
     }
 
     match args.cmd {

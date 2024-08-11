@@ -10,11 +10,17 @@ pub fn execute(cmd: &Cmd) -> anyhow::Result<()> {
 
         match cmd {
             // Insert into account
-            DbSubCmd::Account { nick, descriptor } => {
+            DbSubCmd::Account {
+                network,
+                nick,
+                descriptor,
+            } => {
                 let mut stmt = db.prepare(
-                    "INSERT INTO account (nick, descriptor) VALUES (:nick, :descriptor)",
+                    "INSERT INTO account (network, nick, descriptor) VALUES (:network, :nick, :descriptor)",
                 )?;
-                let ct = stmt.execute(named_params! {":nick": nick, ":descriptor": descriptor})?;
+                let ct = stmt.execute(
+                    named_params! {":network": network, ":nick": nick, ":descriptor": descriptor},
+                )?;
                 println!("Inserted {ct} rows into table account");
 
                 // get current acct id

@@ -88,6 +88,9 @@ pub enum DescSubCmd {
 pub enum DbSubCmd {
     /// Add new quorum account
     Account {
+        /// Network
+        #[arg(required = true)]
+        network: String,
         /// Account nickname
         #[arg(required = true)]
         nick: String,
@@ -118,7 +121,11 @@ pub enum WalletSubCmd {
     #[clap(subcommand)]
     Address(AddressSubCmd),
     /// Sync with blockchain
-    Sync,
+    Sync {
+        /// Begin scan from height
+        #[clap(long)]
+        start: Option<u32>,
+    },
     /// Transactions
     #[clap(subcommand)]
     Tx(TxSubCmd),

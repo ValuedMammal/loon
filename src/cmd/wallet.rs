@@ -5,8 +5,9 @@ use bdk_bitcoind_rpc::compact_filter;
 use bdk_wallet::bitcoin::Address;
 use bdk_wallet::bitcoin::Amount;
 use bdk_wallet::bitcoin::FeeRate;
-use bdk_wallet::bitcoin::Network;
+use bdk_wallet::chain::BlockId;
 use bdk_wallet::KeychainKind;
+use loon::bitcoincore_rpc::RpcApi;
 use loon::Coordinator;
 
 use super::Result;
@@ -16,6 +17,8 @@ use crate::cli::WalletSubCmd;
 
 // Perform wallet operations.
 pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()> {
+    let network = coordinator.network();
+
     match subcmd {
         // Address
         WalletSubCmd::Address(cmd) => match cmd {
@@ -73,7 +76,17 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
             println!("{}: {}", pid, p.alias.clone().unwrap_or("None".to_string()));
         }
         // Sync to chain tip
-        WalletSubCmd::Sync => {
+        WalletSubCmd::Sync { start } => {
+            if let Some(height) = start {
+                if height > coordinator.wallet().latest_checkpoint().height() {
+                    // insert a block to avoid scanning the entire chain
+                    let hash = coordinator.rpc_client().get_block_hash(height as u64)?;
+                    let _ = coordinator
+                        .wallet_mut()
+                        .insert_checkpoint(BlockId { height, hash })?;
+                }
+            }
+
             let mut req = compact_filter::Request::<KeychainKind>::new(
                 coordinator.wallet().latest_checkpoint(),
             );
@@ -88,10 +101,10 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
             }
 
             println!("Inventory");
-            req.inspect_spks(|keychain, index, spk| {
+            req.inspect_spks(move |keychain, index, spk| {
                 println!(
                     "{keychain:?} {index} {}",
-                    Address::from_script(spk, Network::Signet).expect("valid Address")
+                    Address::from_script(spk, network).expect("valid Address")
                 );
                 std::io::stdout().flush().unwrap();
             });
@@ -119,7 +132,7 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                         .spk_index()
                         .index_of_spk(utxo.txout.script_pubkey.clone())
                         .unwrap(),
-                    Address::from_script(&utxo.txout.script_pubkey, Network::Signet)?,
+                    Address::from_script(&utxo.txout.script_pubkey, network)?,
                     utxo.txout.value.to_btc(),
                     utxo.outpoint,
                 );

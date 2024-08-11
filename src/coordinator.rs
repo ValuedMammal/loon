@@ -3,6 +3,8 @@ use std::fmt;
 
 use bdk_wallet::bitcoin::hashes::sha256;
 use bdk_wallet::bitcoin::hashes::Hash;
+use bdk_wallet::bitcoin::Network;
+use bdk_wallet::KeychainKind;
 use nostr_sdk::FromBech32;
 
 use super::bitcoincore_rpc;
@@ -20,8 +22,8 @@ pub const HRP: &str = "loon1";
 /// Coordinator
 #[derive(Debug)]
 pub struct Coordinator {
-    // account short name
-    label: String,
+    // quorum fingerprint
+    fingerprint: String,
     // bdk Wallet
     wallet: Wallet,
     // relates quorum_id to a participant
@@ -36,14 +38,12 @@ impl Coordinator {
     /// Build a Coordinator from parts.
     ///
     /// See [`Builder`].
-    pub fn builder(label: &str, wallet: Wallet) -> Builder {
-        let mut builder = Builder::default();
-        builder.label(label).wallet(wallet);
-        builder
+    pub fn builder() -> Builder {
+        Builder::default()
     }
 
-    /// Insert a `Participant`.
-    pub fn insert(&mut self, pid: impl Into<Pid>, participant: impl Into<Participant>) {
+    /// Add a `Participant`.
+    pub fn add_participant(&mut self, pid: impl Into<Pid>, participant: impl Into<Participant>) {
         self.participants.insert(pid.into(), participant.into());
     }
 
@@ -52,9 +52,9 @@ impl Coordinator {
         self.participants.get(&pid.into())
     }
 
-    /// Get the current `Account` nickname.
-    pub fn label(&self) -> &str {
-        &self.label
+    /// Get the wallet network.
+    pub fn network(&self) -> Network {
+        self.wallet.network()
     }
 
     /// Get a reference to the `Wallet`.
@@ -95,18 +95,14 @@ impl Coordinator {
     ///
     /// This value is defined as the first four bytes of the sha256 hash of the wallet's
     /// public descriptor.
-    pub fn quorum_fingerprint(&self) -> String {
-        let desc = self
-            .wallet
-            .public_descriptor(bdk_wallet::KeychainKind::External);
-        let hash = sha256::Hash::hash(desc.to_string().as_bytes());
-        (hash.to_string()[..8]).to_string()
+    pub fn quorum_fingerprint(&self) -> &str {
+        &self.fingerprint
     }
 
     /// Creates a new `Call` to `recipient` with the given `payload`.
     pub fn call_new_with_recipient_and_payload(&self, recipient: Pid, payload: &str) -> Call {
         let mut call = Call::new(HRP);
-        call.push(&self.quorum_fingerprint())
+        call.push(self.quorum_fingerprint())
             .push(&recipient.to_string())
             .build(payload);
         call
@@ -123,50 +119,44 @@ impl Coordinator {
 /// Builder.
 #[derive(Debug, Default)]
 pub struct Builder {
-    label: Option<String>,
     wallet: Option<Wallet>,
     messenger: Option<nostr::Client>,
     rpc_client: Option<bitcoincore_rpc::Client>,
 }
 
 impl Builder {
-    /// Setter for label.
-    fn label(&mut self, label: &str) -> &mut Self {
-        self.label = Some(label.to_string());
-        self
-    }
-
-    /// Setter for wallet.
-    fn wallet(&mut self, wallet: Wallet) -> &mut Self {
+    /// Setter for BDK wallet.
+    pub fn wallet(mut self, wallet: Wallet) -> Self {
         self.wallet = Some(wallet);
         self
     }
 
     /// Setter for nostr client.
-    pub fn with_nostr_client(&mut self, client: nostr::Client) -> &mut Self {
+    pub fn nostr_client(mut self, client: nostr::Client) -> Self {
         self.messenger = Some(client);
         self
     }
 
     /// Setter for RPC client.
-    pub fn with_rpc_client(&mut self, client: bitcoincore_rpc::Client) -> &mut Self {
+    pub fn rpc_client(mut self, client: bitcoincore_rpc::Client) -> Self {
         self.rpc_client = Some(client);
         self
     }
 
-    /// Finish building and return a new Coordinator.
+    /// Finish building and return a new [`Coordinator`].
     pub fn build(self) -> Result<Coordinator, Error> {
-        if self.label.is_none()
-            || self.wallet.is_none()
-            || self.messenger.is_none()
-            || self.rpc_client.is_none()
-        {
+        if self.wallet.is_none() || self.messenger.is_none() || self.rpc_client.is_none() {
             return Err(Error::Builder);
         }
 
+        let wallet = self.wallet.unwrap();
+        let desc = wallet.public_descriptor(KeychainKind::External);
+        let fingerprint =
+            sha256::Hash::hash(desc.to_string().as_bytes()).to_string()[..8].to_string();
+
         Ok(Coordinator {
-            label: self.label.unwrap(),
-            wallet: self.wallet.unwrap(),
+            fingerprint,
+            wallet,
             participants: BTreeMap::new(),
             messenger: self.messenger.unwrap(),
             rpc_client: self.rpc_client.unwrap(),

@@ -86,7 +86,7 @@ async fn decrypt_raw_entries(
 
         // parse quorum FP
         let quorum_fp = &message[5..13];
-        if quorum_fp == coordinator.quorum_fingerprint().as_str() {
+        if quorum_fp == coordinator.quorum_fingerprint() {
             // parse two-digit pid, e.g. '02'
             let quid: u32 = message[13..15].parse()?;
 
