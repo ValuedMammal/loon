@@ -13,14 +13,12 @@ The app uses BDK, nostr-sdk, clap, and tokio. Right now it's a simple CLI made f
 ### Requirements
 - A local bitcoind configured with `-blockfilterindex` and `-peerblockfilters`
 - These environment variables must be set
-    - `RPC_COOKIE` - path to bitcoind cookie file for communicating over RPC, e.g. `/home/satoshi/.bitcoin/signet/.cookie`
+    - `RPC_COOKIE` - path to bitcoind cookie file for communicating over RPC, e.g. `/home/satoshi/.bitcoin/.cookie`
     - `NOSTR_NSEC` - to sign/publish nostr events
 - Sqlite data store, i.e. `loon.db`. See the [schema](./schema.sql).
 
 ### Limitations
-We currently hardcode the bitcoin network to Signet for testing purposes, but this should change in the future.
-
-We use [a fork of BDK](https://github.com/ValuedMammal/bdk/tree/feat/bitcoind-rpc-filter) that supports compact block filter (CBF) sync via Bitcoin Core RPC. While multiple efforts are underway for BDK to officially support CBF, it's not certain whether the implementation used in Loon will ever be officially adopted/merged.
+We use [a fork of BDK](https://github.com/ValuedMammal/bdk/tree/feat/bitcoind-rpc-filter) that supports compact block filter (CBF) sync via Bitcoin Core RPC. While multiple efforts are underway for BDK to officially support CBF, it's not certain whether the implementation used by Loon will ever be adopted/merged.
 
 ## Features
 |Status|Task|
@@ -40,5 +38,5 @@ We use [a fork of BDK](https://github.com/ValuedMammal/bdk/tree/feat/bitcoind-rp
 |✅ | Get addresses |
 |✅ | Create PSBTs |
 |✅ | List wallet transactions |
-|_ | Make network configurable |
+|✅ | Support mainnet, signet |
 |_ | Send raw transaction |
