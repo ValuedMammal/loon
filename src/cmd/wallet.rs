@@ -116,18 +116,19 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                 std::io::stdout().flush().unwrap();
             });
 
-            let mut client = req.build_client(coordinator.rpc_client());
+            let client = req.build_client(coordinator.rpc_client());
 
-            let compact_filter::Update {
+            if let Some(compact_filter::Update {
                 tip,
                 indexed_tx_graph,
-            } = client.sync()?;
-
-            coordinator.wallet_mut().apply_update(bdk_wallet::Update {
-                chain: Some(tip),
-                graph: indexed_tx_graph.graph().clone(),
-                last_active_indices: indexed_tx_graph.index.last_used_indices(),
-            })?;
+            }) = client.sync()?
+            {
+                coordinator.wallet_mut().apply_update(bdk_wallet::Update {
+                    chain: Some(tip),
+                    graph: indexed_tx_graph.graph().clone(),
+                    last_active_indices: indexed_tx_graph.index.last_used_indices(),
+                })?;
+            }
 
             println!("\nUnspent");
             let unspent: Vec<_> = coordinator.wallet().list_unspent().collect();
