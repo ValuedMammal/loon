@@ -159,7 +159,13 @@ pub enum TxSubCmd {
         amount: u64,
         /// Feerate (sat/vb)
         #[clap(long, short)]
-        feerate: f64,
+        feerate: Option<f64>,
+    },
+    /// Send all
+    Sweep {
+        /// Recipient address
+        #[clap(required = true)]
+        recipient: String,
     },
     /// List transactions
     List,

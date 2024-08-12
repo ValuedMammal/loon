@@ -43,17 +43,24 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
         },
         WalletSubCmd::Tx(cmd) => match cmd {
             // Create tx
+            TxSubCmd::Sweep { recipient } => {
+                let addr = Address::from_str(&recipient)?.assume_checked();
+                let mut builder = coordinator.wallet_mut().build_tx();
+                builder.drain_to(addr.script_pubkey()).drain_wallet();
+                let psbt = builder.finish()?;
+                println!("{psbt}");
+            }
             TxSubCmd::New {
                 recipient,
                 amount,
-                mut feerate,
+                feerate,
             } => {
                 let addr = Address::from_str(&recipient)?.assume_checked();
-                feerate *= 250.0; // -> sat/kwu
+                let sat_kwu = feerate.unwrap_or(1.0) * 250.0;
                 let mut builder = coordinator.wallet_mut().build_tx();
                 builder
                     .add_recipient(addr.script_pubkey(), Amount::from_sat(amount))
-                    .fee_rate(FeeRate::from_sat_per_kwu(feerate as u64));
+                    .fee_rate(FeeRate::from_sat_per_kwu(sat_kwu as u64));
                 let psbt = builder.finish()?;
                 println!("{psbt}");
             }
