@@ -5,6 +5,7 @@ pub mod db;
 
 pub use {
     bdk_bitcoind_rpc::bitcoincore_rpc,
+    bdk_wallet::chain as bdk_chain,
     bdk_wallet::rusqlite,
     // Re-exports
     coordinator::{Call, CallTy, Coordinator, Participant, HRP},
@@ -12,7 +13,7 @@ pub use {
 };
 
 /// Alias for a Bdk persisted wallet
-pub type Wallet = bdk_wallet::chain::Persisted<bdk_wallet::Wallet>;
+pub type Wallet = bdk_wallet::PersistedWallet<rusqlite::Connection>;
 
 /// Bdk wallet db path
 pub const BDK_DB_PATH: &str = "./wallet.db";

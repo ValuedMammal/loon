@@ -1,12 +1,18 @@
-use std::io::Write;
 use std::str::FromStr;
 
-use bdk_bitcoind_rpc::compact_filter;
+use bdk_bitcoind_rpc::bip158::Event;
+use bdk_bitcoind_rpc::bip158::EventInner;
+use bdk_bitcoind_rpc::bip158::FilterIter;
+use bdk_chain::ConfirmationBlockTime;
 use bdk_wallet::bitcoin::Address;
 use bdk_wallet::bitcoin::Amount;
 use bdk_wallet::bitcoin::FeeRate;
 use bdk_wallet::chain::BlockId;
+use bdk_wallet::chain::SpkIterator;
 use bdk_wallet::KeychainKind;
+use bdk_wallet::Update;
+use loon::bdk_chain;
+use loon::bdk_chain::keychain_txout::KeychainTxOutIndex;
 use loon::bitcoincore_rpc::RpcApi;
 use loon::Coordinator;
 
@@ -94,7 +100,8 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                 }
             }
 
-            let mut req = compact_filter::Request::<KeychainKind>::new(
+            let mut emitter = FilterIter::new_with_checkpoint(
+                coordinator.rpc_client(),
                 coordinator.wallet().latest_checkpoint(),
             );
 
@@ -104,32 +111,45 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                     .spk_index()
                     .last_revealed_index(keychain)
                     .unwrap_or(10);
-                req.add_descriptor(keychain, desc.clone(), 0..=last_reveal);
-            }
-
-            println!("Inventory");
-            req.inspect_spks(move |keychain, index, spk| {
-                println!(
-                    "{keychain:?} {index} {}",
-                    Address::from_script(spk, network).expect("valid Address")
+                emitter.add_spks(
+                    SpkIterator::new_with_range(desc, 0..=last_reveal).map(|(_, spk)| spk),
                 );
-                std::io::stdout().flush().unwrap();
-            });
+            }
+            let mut tmp_graph = bdk_chain::IndexedTxGraph::<
+                ConfirmationBlockTime,
+                KeychainTxOutIndex<KeychainKind>,
+            >::default();
 
-            let client = req.build_client(coordinator.rpc_client());
-
-            if let Some(compact_filter::Update {
-                tip,
-                indexed_tx_graph,
-            }) = client.sync()?
-            {
-                coordinator.wallet_mut().apply_update(bdk_wallet::Update {
-                    chain: Some(tip),
-                    graph: indexed_tx_graph.graph().clone(),
-                    last_active_indices: indexed_tx_graph.index.last_used_indices(),
+            // sync
+            if emitter.get_tip()?.is_some() {
+                for event in emitter.by_ref() {
+                    match event? {
+                        Event::NoMatch => {}
+                        Event::Block(inner) => {
+                            let EventInner { height, block } = inner;
+                            _ = tmp_graph.apply_block_relevant(&block, height);
+                        }
+                    }
+                }
+                // apply chain update
+                if let Some(tip) = emitter.chain_update()? {
+                    let wallet = coordinator.wallet_mut();
+                    wallet.apply_update(Update {
+                        chain: Some(tip),
+                        ..Default::default()
+                    })?;
+                    coordinator.save_wallet_changes()?;
+                }
+                // apply graph update
+                let wallet = coordinator.wallet_mut();
+                wallet.apply_update(Update {
+                    tx_update: tmp_graph.graph().clone().into(),
+                    ..Default::default()
                 })?;
+                coordinator.save_wallet_changes()?;
             }
 
+            println!("Local tip: {}", coordinator.wallet().latest_checkpoint().height());
             println!("\nUnspent");
             let unspent: Vec<_> = coordinator.wallet().list_unspent().collect();
             for utxo in unspent {
