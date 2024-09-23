@@ -100,10 +100,9 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                 }
             }
 
-            let mut emitter = FilterIter::new_with_checkpoint(
-                coordinator.rpc_client(),
-                coordinator.wallet().latest_checkpoint(),
-            );
+            let cp = coordinator.wallet().latest_checkpoint();
+            let start_height = cp.height();
+            let mut emitter = FilterIter::new_with_checkpoint(coordinator.rpc_client(), cp);
 
             for (keychain, desc) in coordinator.wallet().spk_index().keychains() {
                 let last_reveal = coordinator
@@ -121,24 +120,28 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
             >::default();
 
             // sync
-            if emitter.get_tip()?.is_some() {
+            if let Some(tip) = emitter.get_tip()? {
+                let blocks_to_scan = tip.height - start_height;
+
                 for event in emitter.by_ref() {
-                    match event? {
-                        Event::NoMatch => {}
-                        Event::Block(inner) => {
-                            let EventInner { height, block } = inner;
-                            _ = tmp_graph.apply_block_relevant(&block, height);
-                        }
+                    let event = event?;
+                    let curr = event.height();
+                    if let Event::Block(EventInner { height, ref block }) = event {
+                        let _ = tmp_graph.apply_block_relevant(block, height);
+                        println!("Matched block {}", curr);
+                    }
+                    if curr % 1000 == 0 {
+                        let progress = (curr - start_height) as f32 / blocks_to_scan as f32;
+                        println!("[{:.2}%]", progress * 100.0);
                     }
                 }
                 // apply chain update
-                if let Some(tip) = emitter.chain_update()? {
+                if let Some(tip) = emitter.chain_update() {
                     let wallet = coordinator.wallet_mut();
                     wallet.apply_update(Update {
                         chain: Some(tip),
                         ..Default::default()
                     })?;
-                    coordinator.save_wallet_changes()?;
                 }
                 // apply graph update
                 let wallet = coordinator.wallet_mut();
@@ -149,7 +152,10 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                 coordinator.save_wallet_changes()?;
             }
 
-            println!("Local tip: {}", coordinator.wallet().latest_checkpoint().height());
+            println!(
+                "Local tip: {}",
+                coordinator.wallet().latest_checkpoint().height()
+            );
             println!("\nUnspent");
             let unspent: Vec<_> = coordinator.wallet().list_unspent().collect();
             for utxo in unspent {
