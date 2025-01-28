@@ -17,9 +17,6 @@ The app uses BDK, nostr-sdk, clap, and tokio. Right now it's a simple CLI made f
     - `NOSTR_NSEC` - to sign/publish nostr events
 - Sqlite data store, i.e. `loon.db`. See the [schema](./schema.sql).
 
-### Limitations
-We use [a fork of BDK](https://github.com/ValuedMammal/bdk/tree/feat/filter-iter) that supports compact block filter (CBF) sync via Bitcoin Core RPC. While multiple efforts are underway for BDK to officially support CBF, it's not certain whether the implementation used by Loon will ever be adopted/merged.
-
 ## Features
 |Status|Task|
 |:----:|--------|

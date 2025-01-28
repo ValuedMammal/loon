@@ -2,7 +2,7 @@ use loon::CallTy;
 use loon::Coordinator;
 
 use super::bail;
-use super::nostr::nip44;
+use super::nostr::{EventBuilder, Kind};
 use super::Result;
 use crate::cli::CallOpt;
 use crate::cli::CallSubCmd;
@@ -15,7 +15,9 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
         CallSubCmd::Push { note } => {
             let client = coordinator.messenger();
             client.connect().await;
-            let event = client.publish_text_note(note, None).await?;
+            let event = client
+                .send_event_builder(EventBuilder::new(Kind::TextNote, note))
+                .await?;
             println!("Sent: {}", event.id());
         }
         // Push an encrypted payload to a desginated recipient.
@@ -31,7 +33,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             // Get the recipient
             let Recipient { id, alias } = recipient;
             if let (None, None) = (id, alias.as_ref()) {
-                bail!("no recipient found")
+                bail!("no recipient found");
             };
 
             let p = if let Some(id) = id {
@@ -39,27 +41,24 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             } else {
                 coordinator
                     .participants()
-                    .find(|(&_pid, p)| p.alias == alias)
+                    .find(|(_, p)| p.alias == alias)
                     .map(|(_, p)| p)
                     .unwrap()
             };
 
             // parse params into a payload
-            let payload = {
-                if nack {
-                    CallTy::Nack.id().to_string()
-                } else if ack {
-                    CallTy::Ack.id().to_string()
-                } else {
-                    // text note
-                    let note = match note {
-                        Some(n) if !n.trim().is_empty() => n,
-                        _ => bail!("no message provided"),
-                    };
-
-                    // nip44 encrypt
-                    let my_sec = coordinator.keys().await?.secret_key()?.clone();
-                    nip44::encrypt(&my_sec, &p.pk, note, nip44::Version::V2)?
+            let payload = if nack {
+                CallTy::Nack.id().to_string()
+            } else if ack {
+                CallTy::Ack.id().to_string()
+            } else {
+                // text note
+                match note {
+                    Some(s) if !s.trim().is_empty() => {
+                        // nip44 encrypt
+                        coordinator.signer().await?.nip44_encrypt(&p.pk, &s).await?
+                    }
+                    _ => bail!("no message provided"),
                 }
             };
 
@@ -71,7 +70,9 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             if params.dryrun {
                 println!("Preview: {:#?}", &call);
             } else {
-                let event = client.publish_text_note(call.to_string(), None).await?;
+                let event = client
+                    .send_event_builder(EventBuilder::new(Kind::TextNote, call.to_string()))
+                    .await?;
                 println!("Sent: {}", event.id());
             }
         }

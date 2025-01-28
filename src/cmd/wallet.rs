@@ -79,7 +79,7 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
         },
         // Display the person alias for the current user.
         WalletSubCmd::Whoami => {
-            let my_pk = coordinator.keys().await?.public_key();
+            let my_pk = coordinator.signer().await?.get_public_key().await?;
 
             let (pid, p) = coordinator
                 .participants()
@@ -92,11 +92,10 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
         WalletSubCmd::Sync { start } => {
             if let Some(height) = start {
                 if height > coordinator.wallet().latest_checkpoint().height() {
-                    // insert a block to avoid scanning the entire chain
-                    let hash = coordinator.rpc_client().get_block_hash(height as u64)?;
-                    let _ = coordinator
-                        .wallet_mut()
-                        .insert_checkpoint(BlockId { height, hash })?;
+                    // insert a block to prevent scanning the entire chain
+                    let hash = coordinator.rpc_client().get_block_hash(height as _)?;
+                    let block = BlockId { height, hash };
+                    bdk_wallet::test_utils::insert_checkpoint(coordinator.wallet_mut(), block);
                 }
             }
 
@@ -127,8 +126,8 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                     let event = event?;
                     let curr = event.height();
                     if let Event::Block(EventInner { height, ref block }) = event {
-                        let _ = tmp_graph.apply_block_relevant(block, height);
                         println!("Matched block {}", curr);
+                        let _ = tmp_graph.apply_block_relevant(block, height);
                     }
                     if curr % 1000 == 0 {
                         let progress = (curr - start_height) as f32 / blocks_to_scan as f32;

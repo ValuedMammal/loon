@@ -105,7 +105,7 @@ pub enum DbSubCmd {
         account_id: u32,
         /// Quorum id
         #[clap(required = true)]
-        quid: u32,
+        quorum_id: u32,
         /// Nostr npub
         #[clap(required = true)]
         npub: String,

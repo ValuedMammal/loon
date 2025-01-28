@@ -29,14 +29,14 @@ async fn main() -> cmd::Result<()> {
         Cmd::Keys => {
             let keys = Keys::generate();
             println!("{}", keys.public_key().to_bech32()?);
-            println!("{}", keys.secret_key()?.to_bech32()?);
+            println!("{}", keys.secret_key().to_bech32()?);
             return Ok(());
         }
         _ => {}
     }
 
     // Get descriptors from loon db
-    let acct_id = args.account_id.unwrap_or(1);
+    let acct_id = args.account_id.unwrap_or(2);
     let db = rusqlite::Connection::open(DB_PATH)?;
 
     let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
@@ -78,6 +78,7 @@ async fn main() -> cmd::Result<()> {
     })?;
 
     // Load bdk store for the provided quorum
+    // TODO: the path to the wallet db should match the current account quorum
     let mut conn = rusqlite::Connection::open(BDK_DB_PATH)?;
     let wallet = match bdk_wallet::LoadParams::new().load_wallet(&mut conn)? {
         Some(wallet) => wallet,
@@ -93,9 +94,8 @@ async fn main() -> cmd::Result<()> {
     let core = bitcoincore_rpc::Client::new(&url, auth)?;
 
     // Configure nostr client
-    let nsec = Keys::parse(env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
-    let opt = Options::new().wait_for_send(false).timeout(cmd::TIMEOUT);
-    let client = Client::with_opts(&nsec, opt);
+    let nsec = Keys::parse(&env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
+    let client = Client::builder().signer(nsec).build();
     client.add_relay("wss://relay.damus.io").await?;
 
     // Create Coordinator

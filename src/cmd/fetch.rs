@@ -9,14 +9,13 @@ use loon::CallTy;
 use loon::ChatEntry;
 use loon::Coordinator;
 
-use super::nostr::nip44;
 use super::nostr::{EventId, Filter, Kind, PublicKey, Timestamp};
 use super::Result;
 
 /// How far to look back in time when polling the relay, currently one fortnight.
 const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
-/// Encrypted raw messages with author, keyed by `EventId`.
+/// Encrypted content and author keyed by `EventId`.
 type RawEntries = HashMap<EventId, (PublicKey, String)>;
 
 /// Fetch latest notes by quorum parties, printing results to stdout.
@@ -33,7 +32,7 @@ pub async fn fetch_and_decrypt(coordinator: &Coordinator) -> Result<()> {
 async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
     let client = coordinator.messenger();
     client.connect().await;
-    let mut ret = RawEntries::new();
+    let mut entries = RawEntries::new();
 
     let subs: Vec<Filter> = coordinator
         .participants()
@@ -44,18 +43,15 @@ async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
         })
         .collect();
 
-    let events = client.get_events_of(subs, Some(super::TIMEOUT)).await?;
+    let events = client.fetch_events(subs, super::TIMEOUT).await?;
 
-    events
-        .iter()
-        .filter(|event| matches!(event.kind, Kind::TextNote))
-        .for_each(|e| {
-            let author = e.author();
-            let content = e.content().to_owned();
-            ret.insert(e.id(), (author, content));
-        });
+    for event in events {
+        if let Kind::TextNote = event.kind {
+            entries.insert(event.id, (event.pubkey, event.content));
+        }
+    }
 
-    Ok(ret)
+    Ok(entries)
 }
 
 /// Decrypt nip44.
@@ -63,8 +59,7 @@ async fn decrypt_raw_entries(
     coordinator: &Coordinator,
     messages: impl IntoIterator<Item = (PublicKey, String)>,
 ) -> Result<Vec<ChatEntry>> {
-    let k = coordinator.keys().await?;
-    let my_sec = k.secret_key()?;
+    let signer = coordinator.signer().await?;
     let mut ret = vec![];
 
     // If we see HRP, we read the message fingerprint and check if it matches the current
@@ -98,14 +93,14 @@ async fn decrypt_raw_entries(
 
             if let Some((_pid, participant)) = participant {
                 // parse payload for the intended recipient
-                if participant.pk == k.public_key() {
+                if participant.pk == signer.get_public_key().await? {
                     assert!(message.len() > 15);
                     let payload = &message[15..];
                     let res = match payload {
                         "0" => CallTy::Nack,
                         "1" => CallTy::Ack,
                         _ => {
-                            let decoded = nip44::decrypt(my_sec, &pk, payload)?;
+                            let decoded = signer.nip44_decrypt(&pk, payload).await?;
                             CallTy::Note(decoded)
                         }
                     };
@@ -168,11 +163,9 @@ pub async fn fetch(coordinator: Coordinator) -> Result<()> {
     let subs = Filter::new()
         .authors(coordinator.participants().map(|(_id, p)| p.pk))
         .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
-    let events = client
-        .get_events_of(vec![subs], Some(super::TIMEOUT))
-        .await?;
+    let events = client.fetch_events(vec![subs], super::TIMEOUT).await?;
     for event in events {
-        if matches!(event.kind, Kind::TextNote) {
+        if let Kind::TextNote = event.kind {
             println!("{}", event.content);
         }
     }

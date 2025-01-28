@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 use bdk_wallet::bitcoin::hashes::sha256;
 use bdk_wallet::bitcoin::hashes::Hash;
@@ -82,13 +83,9 @@ impl Coordinator {
         &self.rpc_client
     }
 
-    /// Get nostr keys.
-    pub async fn keys(&self) -> Result<nostr::Keys, Error> {
-        let signer = self.messenger.signer().await.map_err(Error::Nostr)?;
-        let NostrSigner::Keys(k) = signer else {
-            return Err(Error::Coordinator("only Keys signers allowed".to_string()));
-        };
-        Ok(k)
+    /// Get nostr signer.
+    pub async fn signer(&self) -> Result<Arc<dyn NostrSigner>, Error> {
+        self.messenger.signer().await.map_err(Error::Nostr)
     }
 
     /// Returns the unique fingerprint of the active quorum.
@@ -175,7 +172,7 @@ pub struct Participant {
 
 impl From<db::Friend> for Participant {
     fn from(friend: db::Friend) -> Self {
-        let pk = nostr_sdk::PublicKey::from_bech32(friend.npub).expect("must have valid npub");
+        let pk = nostr_sdk::PublicKey::from_bech32(&friend.npub).expect("must have valid npub");
         Self {
             pk,
             alias: friend.alias,

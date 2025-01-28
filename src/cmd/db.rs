@@ -31,13 +31,13 @@ pub fn execute(cmd: &Cmd) -> anyhow::Result<()> {
             // Insert into friend
             DbSubCmd::Friend {
                 account_id,
-                quid,
+                quorum_id,
                 npub,
                 alias,
             } => {
-                let mut stmt = db.prepare("INSERT INTO friend (account_id, quorum_id, npub, alias) VALUES (:account_id, :quid, :npub, :alias)")?;
+                let mut stmt = db.prepare("INSERT INTO friend (account_id, quorum_id, npub, alias) VALUES (:account_id, :quorum_id, :npub, :alias)")?;
                 let ct =
-                    stmt.execute(named_params! {":account_id": account_id, ":quid": quid, ":npub": npub, ":alias": alias})?;
+                    stmt.execute(named_params! {":account_id": account_id, ":quorum_id": quorum_id, ":npub": npub, ":alias": alias})?;
                 println!("Inserted {ct} rows into table friend");
             }
         }

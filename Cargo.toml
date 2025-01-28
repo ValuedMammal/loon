@@ -9,9 +9,9 @@ keywords = ["bitcoin", "nostr"]
 
 [dependencies]
 anyhow = "1"
-bdk_wallet = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/filter-iter", features = ["rusqlite"] }
-bdk_bitcoind_rpc = { git = "http://github.com/ValuedMammal/bdk", branch = "feat/filter-iter" }
-clap = { version = "4.4.8", features = ["derive"] }
-nostr-sdk = { version = "0.33" }
+bdk_wallet = { version = "1.1", features = ["rusqlite", "test-utils"] }
+bdk_bitcoind_rpc = "0.18"
+clap = { version = "4.5", features = ["derive"] }
+nostr-sdk = { version = "0.38", features = ["nip44"] }
 tokio = { version = "1", features = ["full"] }
 regex-lite = "0.1.6"
