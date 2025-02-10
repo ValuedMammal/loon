@@ -1,9 +1,6 @@
 use std::str::FromStr;
 
-use bdk_bitcoind_rpc::bip158::Event;
-use bdk_bitcoind_rpc::bip158::EventInner;
-use bdk_bitcoind_rpc::bip158::FilterIter;
-use bdk_chain::ConfirmationBlockTime;
+use bdk_bitcoind_rpc::bip158::{Event, EventInner, FilterIter};
 use bdk_wallet::bitcoin::Address;
 use bdk_wallet::bitcoin::Amount;
 use bdk_wallet::bitcoin::FeeRate;
@@ -12,14 +9,12 @@ use bdk_wallet::chain::SpkIterator;
 use bdk_wallet::KeychainKind;
 use bdk_wallet::Update;
 use loon::bdk_chain;
-use loon::bdk_chain::keychain_txout::KeychainTxOutIndex;
+use loon::bdk_chain::ConfirmationBlockTime;
 use loon::bitcoincore_rpc::RpcApi;
 use loon::Coordinator;
 
 use super::Result;
-use crate::cli::AddressSubCmd;
-use crate::cli::TxSubCmd;
-use crate::cli::WalletSubCmd;
+use crate::cli::{AddressSubCmd, TxSubCmd, WalletSubCmd};
 
 // Perform wallet operations.
 pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()> {
@@ -101,6 +96,12 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
 
             let cp = coordinator.wallet().latest_checkpoint();
             let start_height = cp.height();
+
+            // clone out the keychains into a temporary tx graph
+            let mut tmp_graph = bdk_chain::IndexedTxGraph::<ConfirmationBlockTime, _>::new(
+                coordinator.wallet().spk_index().clone(),
+            );
+
             let mut emitter = FilterIter::new_with_checkpoint(coordinator.rpc_client(), cp);
 
             for (keychain, desc) in coordinator.wallet().spk_index().keychains() {
@@ -113,10 +114,6 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                     SpkIterator::new_with_range(desc, 0..=last_reveal).map(|(_, spk)| spk),
                 );
             }
-            let mut tmp_graph = bdk_chain::IndexedTxGraph::<
-                ConfirmationBlockTime,
-                KeychainTxOutIndex<KeychainKind>,
-            >::default();
 
             // sync
             if let Some(tip) = emitter.get_tip()? {
@@ -134,19 +131,15 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                         println!("[{:.2}%]", progress * 100.0);
                     }
                 }
-                // apply chain update
-                if let Some(tip) = emitter.chain_update() {
-                    let wallet = coordinator.wallet_mut();
-                    wallet.apply_update(Update {
-                        chain: Some(tip),
-                        ..Default::default()
-                    })?;
-                }
-                // apply graph update
-                let wallet = coordinator.wallet_mut();
-                wallet.apply_update(Update {
-                    tx_update: tmp_graph.graph().clone().into(),
-                    ..Default::default()
+
+                // apply update
+                let last_active_indices = tmp_graph.index.last_used_indices();
+                let tx_update = tmp_graph.graph().clone().into();
+                let chain = emitter.chain_update();
+                coordinator.wallet_mut().apply_update(Update {
+                    last_active_indices,
+                    tx_update,
+                    chain,
                 })?;
                 coordinator.save_wallet_changes()?;
             }
