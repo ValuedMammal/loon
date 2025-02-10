@@ -1,4 +1,5 @@
 use std::env;
+use std::sync::Arc;
 
 use bdk_wallet::bitcoin::Network;
 use clap::Parser;
@@ -10,7 +11,7 @@ use loon::Coordinator;
 use loon::BDK_DB_PATH;
 use loon::DB_PATH;
 
-use cli::{Args, Cmd};
+use cli::{Args, Cmd, WalletSubCmd};
 use cmd::Context;
 
 mod cli;
@@ -28,7 +29,7 @@ async fn main() -> cmd::Result<()> {
         }
         Cmd::Keys => {
             let keys = Keys::generate();
-            println!("{}", keys.public_key().to_bech32()?);
+            println!("{}", keys.public_key.to_bech32()?);
             println!("{}", keys.secret_key().to_bech32()?);
             return Ok(());
         }
@@ -91,20 +92,25 @@ async fn main() -> cmd::Result<()> {
     let url = format!("http://127.0.0.1:{rpc_port}");
     let cookie_file = env::var("RPC_COOKIE").context("must set RPC_COOKIE")?;
     let auth = bitcoincore_rpc::Auth::CookieFile(cookie_file.into());
-    let core = bitcoincore_rpc::Client::new(&url, auth)?;
+    let rpc_client = bitcoincore_rpc::Client::new(&url, auth)?;
 
-    // Configure nostr client
-    let nsec = Keys::parse(&env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
-    let client = Client::builder().signer(nsec).build();
-    client.add_relay("wss://relay.damus.io").await?;
+    // Configure nostr client if needed
+    let client = match &args.cmd {
+        Cmd::Call(_) | Cmd::Fetch { .. } | Cmd::Wallet(WalletSubCmd::Whoami) => {
+            let nsec = Keys::parse(&env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
+            let client = Client::builder().signer(nsec).build();
+            client.add_relay("wss://relay.damus.io").await?;
+            Some(Arc::new(client))
+        }
+        _ => None,
+    };
 
-    // Create Coordinator
-    let mut coordinator = Coordinator::builder()
-        .wallet(wallet)
-        .rpc_client(core)
-        .nostr_client(client)
-        .build()?;
-
+    // Build coordinator
+    let mut builder = Coordinator::builder().wallet(wallet).rpc_client(rpc_client);
+    if let Some(client) = client {
+        builder = builder.client(client);
+    }
+    let mut coordinator = builder.build()?;
     for friend in friends {
         let f = friend?;
         coordinator.add_participant(f.quorum_id, f);

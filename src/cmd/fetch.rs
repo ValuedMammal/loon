@@ -30,7 +30,7 @@ pub async fn fetch_and_decrypt(coordinator: &Coordinator) -> Result<()> {
 
 /// Fetch events from quorum participants.
 async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
-    let client = coordinator.messenger();
+    let client = coordinator.client().expect("must have client");
     client.connect().await;
     let mut entries = RawEntries::new();
 
@@ -155,9 +155,9 @@ pub async fn listen(coordinator: &Coordinator) -> Result<()> {
 }
 
 /// Fetch events from quorum participants.
-#[allow(dead_code)]
+#[allow(unused)]
 pub async fn fetch(coordinator: Coordinator) -> Result<()> {
-    let client = coordinator.messenger();
+    let client = coordinator.client().expect("must have client");
     client.connect().await;
 
     let subs = Filter::new()

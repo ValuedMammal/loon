@@ -30,7 +30,7 @@ pub struct Coordinator {
     // relates quorum_id to a participant
     participants: BTreeMap<Pid, Participant>,
     // nostr client
-    messenger: nostr::Client,
+    client: Option<Arc<nostr::Client>>,
     // source of chain data
     rpc_client: bitcoincore_rpc::Client,
 }
@@ -73,9 +73,9 @@ impl Coordinator {
         self.participants.iter()
     }
 
-    /// Get a reference to the message client.
-    pub fn messenger(&self) -> &nostr::Client {
-        &self.messenger
+    /// Get a reference to the nostr client.
+    pub fn client(&self) -> Option<Arc<nostr::Client>> {
+        self.client.clone()
     }
 
     /// Get a reference to the blockchain RPC client.
@@ -85,7 +85,12 @@ impl Coordinator {
 
     /// Get nostr signer.
     pub async fn signer(&self) -> Result<Arc<dyn NostrSigner>, Error> {
-        self.messenger.signer().await.map_err(Error::Nostr)
+        match &self.client {
+            Some(client) => client.signer().await.map_err(Error::Nostr),
+            None => Err(Error::Coordinator(
+                "no nostr client is configured".to_string(),
+            )),
+        }
     }
 
     /// Returns the unique fingerprint of the active quorum.
@@ -117,7 +122,7 @@ impl Coordinator {
 #[derive(Debug, Default)]
 pub struct Builder {
     wallet: Option<Wallet>,
-    messenger: Option<nostr::Client>,
+    client: Option<Arc<nostr::Client>>,
     rpc_client: Option<bitcoincore_rpc::Client>,
 }
 
@@ -129,8 +134,8 @@ impl Builder {
     }
 
     /// Setter for nostr client.
-    pub fn nostr_client(mut self, client: nostr::Client) -> Self {
-        self.messenger = Some(client);
+    pub fn client(mut self, client: Arc<nostr::Client>) -> Self {
+        self.client = Some(client);
         self
     }
 
@@ -142,7 +147,7 @@ impl Builder {
 
     /// Finish building and return a new [`Coordinator`].
     pub fn build(self) -> Result<Coordinator, Error> {
-        if self.wallet.is_none() || self.messenger.is_none() || self.rpc_client.is_none() {
+        if self.wallet.is_none() || self.rpc_client.is_none() {
             return Err(Error::Builder);
         }
 
@@ -155,7 +160,7 @@ impl Builder {
             fingerprint,
             wallet,
             participants: BTreeMap::new(),
-            messenger: self.messenger.unwrap(),
+            client: self.client,
             rpc_client: self.rpc_client.unwrap(),
         })
     }

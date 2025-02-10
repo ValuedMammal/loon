@@ -13,7 +13,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
     match cmd {
         // Push a plain text note.
         CallSubCmd::Push { note } => {
-            let client = coordinator.messenger();
+            let client = coordinator.client().expect("must have client");
             client.connect().await;
             let event = client
                 .send_event_builder(EventBuilder::new(Kind::TextNote, note))
@@ -64,7 +64,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
 
             // send it
             let call = coordinator.call_new_with_recipient_and_payload(p.quorum_id, &payload);
-            let client = coordinator.messenger();
+            let client = coordinator.client().expect("must have client");
             client.connect().await;
 
             if params.dryrun {
