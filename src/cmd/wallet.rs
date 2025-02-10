@@ -42,6 +42,8 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                     .peek_address(KeychainKind::External, index)
             ),
         },
+        // Balance
+        WalletSubCmd::Balance => println!("{:#?}", coordinator.wallet().balance()),
         WalletSubCmd::Tx(cmd) => match cmd {
             // Create tx
             TxSubCmd::Sweep { recipient } => {

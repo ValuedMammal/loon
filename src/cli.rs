@@ -120,6 +120,8 @@ pub enum WalletSubCmd {
     /// Address
     #[clap(subcommand)]
     Address(AddressSubCmd),
+    /// Get wallet balance
+    Balance,
     /// Sync with blockchain
     Sync {
         /// Begin scan from height
