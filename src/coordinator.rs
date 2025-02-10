@@ -2,9 +2,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
-use bdk_wallet::bitcoin::hashes::sha256;
-use bdk_wallet::bitcoin::hashes::Hash;
 use bdk_wallet::bitcoin::Network;
+use bdk_wallet::chain::DescriptorExt;
 use bdk_wallet::KeychainKind;
 use nostr_sdk::FromBech32;
 
@@ -153,8 +152,8 @@ impl Builder {
 
         let wallet = self.wallet.unwrap();
         let desc = wallet.public_descriptor(KeychainKind::External);
-        let fingerprint =
-            sha256::Hash::hash(desc.to_string().as_bytes()).to_string()[..8].to_string();
+        let did = desc.descriptor_id().to_string();
+        let fingerprint = did[..8].to_string();
 
         Ok(Coordinator {
             fingerprint,
