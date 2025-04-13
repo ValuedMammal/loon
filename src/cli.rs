@@ -28,8 +28,9 @@ pub enum Cmd {
         #[clap(long, short = 'l')]
         listen: bool,
     },
-    /// Generate new nostr keys.
-    Keys,
+    /// Generate a keypair
+    #[clap(subcommand)]
+    Generate(GenerateSubCmd),
     /// Wallet operations.
     #[clap(subcommand)]
     Wallet(WalletSubCmd),
@@ -112,6 +113,18 @@ pub enum DbSubCmd {
         /// Participant alias
         #[clap(required = true)]
         alias: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum GenerateSubCmd {
+    /// Generate nostr keys
+    Nsec,
+    /// Generate a random WIF private key
+    Wif {
+        /// Specifies that the key is valid for test networks. If none specified, use mainnet network kind
+        #[clap(long, short)]
+        test: bool,
     },
 }
 

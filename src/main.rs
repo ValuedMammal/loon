@@ -11,7 +11,7 @@ use loon::Coordinator;
 use loon::BDK_DB_PATH;
 use loon::DB_PATH;
 
-use cli::{Args, Cmd, WalletSubCmd};
+use cli::{Args, Cmd, GenerateSubCmd, WalletSubCmd};
 use cmd::Context;
 
 mod cli;
@@ -21,23 +21,46 @@ mod cmd;
 async fn main() -> cmd::Result<()> {
     let args = Args::parse();
 
-    // Handle db command or generate nostr keys
+    // Handle db command or generate keys
     match args.cmd {
         Cmd::Db(_) => {
             cmd::db::execute(&args.cmd)?;
             return Ok(());
         }
-        Cmd::Keys => {
-            let keys = Keys::generate();
-            println!("{}", keys.public_key.to_bech32()?);
-            println!("{}", keys.secret_key().to_bech32()?);
-            return Ok(());
-        }
+        Cmd::Generate(cmd) => match cmd {
+            GenerateSubCmd::Nsec => {
+                let keys = Keys::generate();
+                println!("{}", keys.public_key.to_bech32()?);
+                println!("{}", keys.secret_key().to_bech32()?);
+                return Ok(());
+            }
+            GenerateSubCmd::Wif { test } => {
+                use bitcoin::secp256k1;
+                use bitcoin::NetworkKind;
+                use rand::Fill;
+                let network = if test {
+                    NetworkKind::Test
+                } else {
+                    NetworkKind::Main
+                };
+                let mut buf = [0x00; 32];
+                buf.try_fill(&mut rand::thread_rng())?;
+
+                let inner = secp256k1::SecretKey::from_slice(&buf)?;
+                let prv = bitcoin::PrivateKey {
+                    compressed: true,
+                    network,
+                    inner,
+                };
+                println!("{}", prv.to_wif());
+                return Ok(());
+            }
+        },
         _ => {}
     }
 
     // Get descriptors from loon db
-    let acct_id = args.account_id.unwrap_or(2);
+    let acct_id = args.account_id.unwrap_or(3);
     let db = rusqlite::Connection::open(DB_PATH)?;
 
     let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
@@ -127,7 +150,7 @@ async fn main() -> cmd::Result<()> {
                 cmd::fetch::fetch_and_decrypt(&coordinator).await?;
             }
         }
-        Cmd::Keys => unreachable!("handled above"),
+        Cmd::Generate(..) => unreachable!("handled above"),
         Cmd::Wallet(subcmd) => cmd::wallet::execute(&mut coordinator, subcmd).await?,
     }
 
