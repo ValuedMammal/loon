@@ -151,15 +151,24 @@ pub enum WalletSubCmd {
 
 #[derive(Subcommand)]
 pub enum AddressSubCmd {
+    /// List addresses
+    List {
+        /// Keychain to list addresses from
+        #[clap(long, short, default_value = "0")]
+        keychain: u8,
+    },
     /// New address
     New,
     /// Next unused
     Next,
-    /// Peek at a given index
+    /// Peek at a given keychain index
     Peek {
         /// Address index
         #[clap(required = true)]
         index: u32,
+        /// Keychain
+        #[clap(long, short, default_value = "0")]
+        keychain: u8,
     },
 }
 
@@ -185,6 +194,12 @@ pub enum TxSubCmd {
     },
     /// List transactions
     List,
+    /// List tx outputs
+    Out {
+        /// List unspent
+        #[clap(long, short)]
+        unspent: bool,
+    },
 }
 
 #[derive(Parser)]

@@ -1,47 +1,35 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use bdk_wallet::bitcoin::Network;
-use bdk_wallet::chain::DescriptorExt;
-use bdk_wallet::KeychainKind;
-use nostr_sdk::FromBech32;
+use bdk_chain::bitcoin;
 
-use super::bitcoincore_rpc;
-use super::nostr;
-use super::nostr::NostrSigner;
-use super::rusqlite;
-use super::Wallet;
-use crate::db;
-use crate::Error;
-use crate::BDK_DB_PATH;
+use nostr_sdk::NostrSigner;
 
-/// Human-readable part of a loon call.
-pub const HRP: &str = "loon1";
+use crate::{
+    bitcoincore_rpc, db,
+    nostr_prelude::{self as nostr, FromBech32},
+    rusqlite, BdkChainWallet as Wallet, Error,
+};
 
 /// Coordinator
 #[derive(Debug)]
 pub struct Coordinator {
-    // quorum fingerprint
-    fingerprint: String,
-    // bdk Wallet
-    wallet: Wallet,
-    // relates quorum_id to a participant
-    participants: BTreeMap<Pid, Participant>,
-    // nostr client
-    client: Option<Arc<nostr::Client>>,
-    // source of chain data
-    rpc_client: bitcoincore_rpc::Client,
+    /// quorum fingerprint
+    pub fingerprint: String,
+    /// Bdk chain wallet
+    pub wallet: Wallet,
+    /// database connection
+    pub db: Arc<Mutex<rusqlite::Connection>>,
+    /// quorum participants by id
+    pub participants: BTreeMap<Pid, Participant>,
+    // Nostr client
+    pub client: Option<Arc<nostr::Client>>,
+    // RPC client
+    pub rpc_client: bitcoincore_rpc::Client,
 }
 
 impl Coordinator {
-    /// Build a Coordinator from parts.
-    ///
-    /// See [`Builder`].
-    pub fn builder() -> Builder {
-        Builder::default()
-    }
-
     /// Add a `Participant`.
     pub fn add_participant(&mut self, pid: impl Into<Pid>, participant: impl Into<Participant>) {
         self.participants.insert(pid.into(), participant.into());
@@ -53,8 +41,8 @@ impl Coordinator {
     }
 
     /// Get the wallet network.
-    pub fn network(&self) -> Network {
-        self.wallet.network()
+    pub fn network(&self) -> bitcoin::Network {
+        self.wallet.network
     }
 
     /// Get a reference to the `Wallet`.
@@ -100,66 +88,19 @@ impl Coordinator {
 
     /// Creates a new `Call` to `recipient` with the given `payload`.
     pub fn call_new_with_recipient_and_payload(&self, recipient: Pid, payload: &str) -> Call {
-        let mut call = Call::new(HRP);
+        let mut call = Call::new(crate::HRP);
         call.push(self.quorum_fingerprint())
             .push(&recipient.to_string())
             .build(payload);
         call
     }
 
-    /// Write changes to bdk database.
-    pub fn save_wallet_changes(&mut self) -> Result<(), Error> {
-        let mut conn = rusqlite::Connection::open(BDK_DB_PATH).map_err(Error::Rusqlite)?;
-        self.wallet.persist(&mut conn).map_err(Error::Rusqlite)?;
-        Ok(())
-    }
-}
-
-/// Builder.
-#[derive(Debug, Default)]
-pub struct Builder {
-    wallet: Option<Wallet>,
-    client: Option<Arc<nostr::Client>>,
-    rpc_client: Option<bitcoincore_rpc::Client>,
-}
-
-impl Builder {
-    /// Setter for BDK wallet.
-    pub fn wallet(mut self, wallet: Wallet) -> Self {
-        self.wallet = Some(wallet);
-        self
-    }
-
-    /// Setter for nostr client.
-    pub fn client(mut self, client: Arc<nostr::Client>) -> Self {
-        self.client = Some(client);
-        self
-    }
-
-    /// Setter for RPC client.
-    pub fn rpc_client(mut self, client: bitcoincore_rpc::Client) -> Self {
-        self.rpc_client = Some(client);
-        self
-    }
-
-    /// Finish building and return a new [`Coordinator`].
-    pub fn build(self) -> Result<Coordinator, Error> {
-        if self.wallet.is_none() || self.rpc_client.is_none() {
-            return Err(Error::Builder);
-        }
-
-        let wallet = self.wallet.unwrap();
-        let desc = wallet.public_descriptor(KeychainKind::External);
-        let did = desc.descriptor_id().to_string();
-        let fingerprint = did[..8].to_string();
-
-        Ok(Coordinator {
-            fingerprint,
-            wallet,
-            participants: BTreeMap::new(),
-            client: self.client,
-            rpc_client: self.rpc_client.unwrap(),
-        })
+    /// Persist the changes that have been staged by the onchain wallet.
+    ///
+    /// Returns whether anything was persisted.
+    pub fn persist(&mut self) -> Result<bool, rusqlite::Error> {
+        let mut conn = self.db.lock().unwrap();
+        self.wallet.persist(&mut conn).map(|c| c.is_some())
     }
 }
 
@@ -279,4 +220,13 @@ impl fmt::Display for Call {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
+}
+
+/// Chat entry.
+#[derive(Debug)]
+pub struct ChatEntry {
+    /// Sender alias
+    pub alias: String,
+    /// Text message
+    pub message: String,
 }

@@ -1,18 +1,27 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::sync::Arc;
+use std::sync::Mutex;
 
-use bdk_wallet::bitcoin::Network;
+use bitcoin::{secp256k1, Network, NetworkKind};
+use miniscript::Descriptor;
+
+use bdk_core::{ConfirmationBlockTime, Merge};
+
+use bdk_chain::{
+    bdk_core, bitcoin, keychain_txout::KeychainTxOutIndex, local_chain::LocalChain, miniscript,
+    DescriptorExt, TxGraph,
+};
 use clap::Parser;
-use loon::bitcoincore_rpc;
-use loon::db;
-use loon::nostr::*;
-use loon::rusqlite;
-use loon::Coordinator;
-use loon::BDK_DB_PATH;
-use loon::DB_PATH;
+use rand::Fill;
+
+use loon::{
+    bitcoincore_rpc, nostr_prelude::*, rusqlite, Account, BdkChainWallet, BdkChangeSet,
+    Coordinator, Friend, Keychain, BDK_CHAIN_DB_PATH, DB_PATH,
+};
 
 use cli::{Args, Cmd, GenerateSubCmd, WalletSubCmd};
-use cmd::Context;
+use cmd::{bail, Context};
 
 mod cli;
 mod cmd;
@@ -35,9 +44,6 @@ async fn main() -> cmd::Result<()> {
                 return Ok(());
             }
             GenerateSubCmd::Wif { test } => {
-                use bitcoin::secp256k1;
-                use bitcoin::NetworkKind;
-                use rand::Fill;
                 let network = if test {
                     NetworkKind::Test
                 } else {
@@ -65,7 +71,7 @@ async fn main() -> cmd::Result<()> {
 
     let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
     let mut rows = stmt.query_map([&acct_id], |row| {
-        Ok(db::Account {
+        Ok(Account {
             id: row.get(0)?,
             network: row.get(1)?,
             nick: row.get(2)?,
@@ -75,25 +81,30 @@ async fn main() -> cmd::Result<()> {
     let acct = match rows.next() {
         Some(acct) => acct?,
         None => {
-            cmd::bail!("no account found for that acct id");
+            bail!("no account found for that acct id");
         }
     };
 
     let (desc, change_desc) = split_desc(&acct.descriptor);
     if change_desc.is_empty() {
-        cmd::bail!("descriptor must be multipath");
+        bail!("descriptor must be multipath");
     }
+    let secp = secp256k1::Secp256k1::new();
+    let desc = Descriptor::parse_descriptor(&secp, &desc)?.0;
+    let change_desc = Descriptor::parse_descriptor(&secp, &change_desc)?.0;
+    let did = desc.descriptor_id().to_string();
+    let quorum_fp = &did[..8];
 
     let (network, rpc_port) = match acct.network.as_str() {
         "signet" => (Network::Signet, 38332),
         "bitcoin" => (Network::Bitcoin, 8332),
-        _ => cmd::bail!("unsupported network"),
+        _ => bail!("unsupported network"),
     };
 
     // Get friends from loon db
     let mut stmt = db.prepare("SELECT * FROM friend WHERE account_id = ?1")?;
     let friends = stmt.query_map([acct.id], |row| {
-        Ok(db::Friend {
+        Ok(Friend {
             account_id: row.get(0)?,
             quorum_id: row.get(1)?,
             npub: row.get(2)?,
@@ -101,15 +112,50 @@ async fn main() -> cmd::Result<()> {
         })
     })?;
 
-    // Load bdk store for the provided quorum
-    // TODO: the path to the wallet db should match the current account quorum
-    let mut conn = rusqlite::Connection::open(BDK_DB_PATH)?;
-    let wallet = match bdk_wallet::LoadParams::new().load_wallet(&mut conn)? {
-        Some(wallet) => wallet,
-        None => bdk_wallet::CreateParams::new(desc, change_desc)
-            .network(network)
-            .create_wallet(&mut conn)?,
+    // Load Bdk chain wallet for the intended quorum
+    // TODO: the path to the wallet should match the account id of the quorum we're loading
+    let mut conn = rusqlite::Connection::open(BDK_CHAIN_DB_PATH)?;
+    let mut tx = conn.transaction()?;
+    let changeset = BdkChangeSet::initialize(&mut tx)?;
+    tx.commit()?;
+
+    let BdkChangeSet {
+        chain: chain_changeset,
+        tx_graph: tx_graph_changeset,
+        indexer,
+    } = changeset.unwrap_or_default();
+
+    let mut stage = BdkChangeSet::default();
+
+    // Initialize chain from the network defined genesis hash
+    // (staging the initial changeset), or directly from the changeset.
+    let chain = if chain_changeset.is_empty() {
+        let (chain, change) =
+            LocalChain::from_genesis_hash(bitcoin::constants::genesis_block(network).block_hash());
+        stage.merge(change.into());
+        chain
+    } else {
+        LocalChain::from_changeset(chain_changeset)?
     };
+    // Initialize txout index
+    let mut index = KeychainTxOutIndex::<Keychain>::default();
+    assert!(index.insert_descriptor(Keychain::EXTERNAL, desc)?);
+    assert!(index.insert_descriptor(Keychain::INTERNAL, change_desc)?);
+    // Initialize tx graph
+    let tx_graph = TxGraph::<ConfirmationBlockTime>::default();
+
+    let mut wallet = BdkChainWallet {
+        network,
+        chain,
+        tx_graph,
+        index,
+        stage,
+    };
+
+    // reindex and apply changes
+    wallet.index.apply_changeset(indexer);
+    wallet.index_tx_graph_changeset(&tx_graph_changeset);
+    wallet.tx_graph.apply_changeset(tx_graph_changeset);
 
     // Configure core rpc
     let url = format!("http://127.0.0.1:{rpc_port}");
@@ -128,16 +174,25 @@ async fn main() -> cmd::Result<()> {
         _ => None,
     };
 
-    // Build coordinator
-    let mut builder = Coordinator::builder().wallet(wallet).rpc_client(rpc_client);
-    if let Some(client) = client {
-        builder = builder.client(client);
-    }
-    let mut coordinator = builder.build()?;
-    for friend in friends {
-        let f = friend?;
+    let db = Arc::new(Mutex::new(conn));
+
+    // init coordinator
+    let mut coordinator = Coordinator {
+        fingerprint: quorum_fp.to_string(),
+        wallet,
+        db,
+        participants: BTreeMap::new(),
+        client,
+        rpc_client,
+    };
+    // add quorum participants
+    for friend_res in friends {
+        let f = friend_res?;
         coordinator.add_participant(f.quorum_id, f);
     }
+    // Persist the just staged change if this is the first time
+    // creating a wallet
+    coordinator.persist()?;
 
     match args.cmd {
         Cmd::Db(_) => unreachable!("handled above"),
