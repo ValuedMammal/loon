@@ -122,7 +122,8 @@ pub enum GenerateSubCmd {
     Nsec,
     /// Generate a random WIF private key
     Wif {
-        /// Specifies that the key is valid for test networks. If none specified, use mainnet network kind
+        /// Specifies that the key is valid for test networks. If none specified, use mainnet
+        /// network kind
         #[clap(long, short)]
         test: bool,
     },

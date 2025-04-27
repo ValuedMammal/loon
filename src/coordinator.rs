@@ -86,9 +86,7 @@ impl Coordinator {
     pub async fn signer(&self) -> Result<Arc<dyn NostrSigner>, Error> {
         match &self.client {
             Some(client) => client.signer().await.map_err(Error::Nostr),
-            None => Err(Error::Coordinator(
-                "no nostr client is configured".to_string(),
-            )),
+            None => Err(Error::Coordinator("no nostr client is configured".to_string())),
         }
     }
 

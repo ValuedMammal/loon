@@ -87,9 +87,7 @@ async fn decrypt_raw_entries(
 
             // derive recipient p from quorum id
             // we should get one because the message fp matches the active quorum
-            let participant = coordinator
-                .participants()
-                .find(|(pid, _p)| pid.as_u32() == quid);
+            let participant = coordinator.participants().find(|(pid, _p)| pid.as_u32() == quid);
 
             if let Some((_pid, participant)) = participant {
                 // parse payload for the intended recipient

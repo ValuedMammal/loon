@@ -1,3 +1,24 @@
-# `cargo fmt`
-#comment_width = 100
-#group_imports = "StdExternalCrate"
+# `cargo +nightly fmt`
+# ignore = []
+# hard_tabs = false
+# tab_spaces = 4
+# newline_style = "Auto"
+# indent_style = "Block"
+
+max_width = 100 # This is the number of characters.
+
+# `use_small_heuristics` is ignored if the granular width config values are explicitly set.
+# use_small_heuristics = "Max"    # "Max" == All granular width settings same as `max_width`.
+# Granular width config settings. These are percentages of `max_width`.
+fn_call_width = 71
+attr_fn_like_width = 71
+struct_lit_width = 18
+struct_variant_width = 35
+array_width = 71
+chain_width = 71
+single_line_if_else_max_width = 50
+single_line_let_else_max_width = 50
+
+comment_width = 100
+wrap_comments = true
+format_code_in_doc_comments = true

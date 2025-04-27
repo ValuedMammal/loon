@@ -1,3 +1,6 @@
+// Allow un-inlined format string args
+#![allow(clippy::uninlined_format_args)]
+
 pub mod call;
 pub mod db;
 pub mod descriptor;

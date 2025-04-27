@@ -25,21 +25,15 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
         WalletSubCmd::Address(cmd) => match cmd {
             AddressSubCmd::New => println!(
                 "{:?}",
-                coordinator
-                    .wallet_mut()
-                    .reveal_next_address(KeychainKind::External)
+                coordinator.wallet_mut().reveal_next_address(KeychainKind::External)
             ),
             AddressSubCmd::Next => println!(
                 "{:?}",
-                coordinator
-                    .wallet_mut()
-                    .next_unused_address(KeychainKind::External)
+                coordinator.wallet_mut().next_unused_address(KeychainKind::External)
             ),
             AddressSubCmd::Peek { index } => println!(
                 "{:?}",
-                coordinator
-                    .wallet_mut()
-                    .peek_address(KeychainKind::External, index)
+                coordinator.wallet_mut().peek_address(KeychainKind::External, index)
             ),
         },
         // Balance
@@ -146,10 +140,7 @@ pub async fn execute(coordinator: &mut Coordinator, subcmd: WalletSubCmd) -> Res
                 coordinator.save_wallet_changes()?;
             }
 
-            println!(
-                "Local tip: {}",
-                coordinator.wallet().latest_checkpoint().height()
-            );
+            println!("Local tip: {}", coordinator.wallet().latest_checkpoint().height());
             println!("\nUnspent");
             let unspent: Vec<_> = coordinator.wallet().list_unspent().collect();
             for utxo in unspent {
