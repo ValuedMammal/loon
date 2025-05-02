@@ -28,6 +28,8 @@ pub enum Cmd {
         #[clap(long, short = 'l')]
         listen: bool,
     },
+    /// Get best block hash
+    Hash,
     /// Generate a keypair
     #[clap(subcommand)]
     Generate(GenerateSubCmd),
@@ -179,12 +181,12 @@ pub enum TxSubCmd {
         /// Recipient address
         #[clap(required = true)]
         recipient: String,
-        /// Amount
+        /// Amount to send in satoshis
         #[clap(required = true)]
-        amount: u64,
+        value: u64,
         /// Feerate (sat/vb)
-        #[clap(long, short)]
-        feerate: Option<f64>,
+        #[clap(long, short, default_value = "1.2")]
+        feerate: f32,
     },
     /// Send all
     Sweep {

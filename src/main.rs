@@ -15,6 +15,7 @@ use bdk_chain::{
 use clap::Parser;
 use rand::Fill;
 
+use loon::bitcoincore_rpc::RpcApi;
 use loon::{
     bitcoincore_rpc, nostr_prelude::*, rusqlite, Account, BdkChainWallet, BdkChangeSet,
     Coordinator, Friend, Keychain, BDK_CHAIN_DB_PATH, DB_PATH,
@@ -204,6 +205,9 @@ async fn main() -> cmd::Result<()> {
             } else {
                 cmd::fetch::fetch_and_decrypt(&coordinator).await?;
             }
+        }
+        Cmd::Hash => {
+            println!("{}", coordinator.rpc_client().get_best_block_hash()?)
         }
         Cmd::Generate(..) => unreachable!("handled above"),
         Cmd::Wallet(subcmd) => cmd::wallet::execute(&mut coordinator, subcmd).await?,
