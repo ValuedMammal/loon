@@ -37,13 +37,16 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             };
 
             let p = if let Some(id) = id {
-                coordinator.get(id).unwrap()
+                coordinator
+                    .get(id)
+                    .ok_or(anyhow::anyhow!("unknown participant id {}", id))?
             } else {
+                let alias = alias.expect("must have alias");
                 coordinator
                     .participants()
-                    .find(|(_, p)| p.alias == alias)
+                    .find(|(_, p)| p.alias.as_ref() == Some(&alias))
                     .map(|(_, p)| p)
-                    .unwrap()
+                    .ok_or(anyhow::anyhow!("unknown participant {}", alias))?
             };
 
             // parse params into a payload
@@ -62,14 +65,14 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
                 }
             };
 
-            // send it
             let call = coordinator.call_new_with_recipient_and_payload(p.quorum_id, &payload);
-            let client = coordinator.client().expect("must have client");
-            client.connect().await;
 
+            // Send it
             if params.dryrun {
                 println!("Preview: {:#?}", &call);
             } else {
+                let client = coordinator.client().expect("must have client");
+                client.connect().await;
                 let event = client
                     .send_event_builder(EventBuilder::new(Kind::TextNote, call.to_string()))
                     .await?;

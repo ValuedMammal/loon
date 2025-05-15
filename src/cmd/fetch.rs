@@ -34,14 +34,9 @@ async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
     client.connect().await;
     let mut entries = RawEntries::new();
 
-    let subs: Vec<Filter> = coordinator
-        .participants()
-        .map(|(_id, p)| {
-            Filter::new()
-                .author(p.pk)
-                .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into())
-        })
-        .collect();
+    let subs = Filter::new()
+        .pubkeys(coordinator.participants().map(|(_, p)| p.pk))
+        .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
 
     let events = client.fetch_events(subs, super::TIMEOUT).await?;
 
@@ -159,9 +154,9 @@ pub async fn fetch(coordinator: Coordinator) -> Result<()> {
     client.connect().await;
 
     let subs = Filter::new()
-        .authors(coordinator.participants().map(|(_id, p)| p.pk))
+        .pubkeys(coordinator.participants().map(|(_id, p)| p.pk))
         .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
-    let events = client.fetch_events(vec![subs], super::TIMEOUT).await?;
+    let events = client.fetch_events(subs, super::TIMEOUT).await?;
     for event in events {
         if let Kind::TextNote = event.kind {
             println!("{}", event.content);
