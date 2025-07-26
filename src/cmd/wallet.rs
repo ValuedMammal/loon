@@ -152,8 +152,12 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
             let mut emitter = FilterIter::new_with_checkpoint(coor.rpc_client(), cp);
 
             for (keychain, desc) in coor.wallet().index.keychains() {
-                let last_reveal =
-                    coor.wallet().index.last_revealed_index(keychain).unwrap_or(SPK_CT);
+                let last_reveal = coor
+                    .wallet()
+                    .index
+                    .last_revealed_index(keychain)
+                    .unwrap_or_default()
+                    .max(SPK_CT);
                 emitter.add_spks(
                     SpkIterator::new_with_range(desc, 0..=last_reveal).map(|(_, spk)| spk),
                 );
