@@ -17,8 +17,8 @@ use rand::Fill;
 
 use loon::bitcoincore_rpc::RpcApi;
 use loon::{
-    bitcoincore_rpc, nostr_prelude::*, rusqlite, Account, BdkChainWallet, BdkChangeSet,
-    Coordinator, Friend, Keychain, BDK_CHAIN_DB_PATH, DB_PATH,
+    bitcoincore_rpc, nostr_prelude::*, rusqlite, Account, BdkChangeSet, BdkWallet, Coordinator,
+    Friend, Keychain, BDK_CHAIN_DB_PATH, DB_PATH,
 };
 
 use cli::{Args, Cmd, GenerateSubCmd, WalletSubCmd};
@@ -67,7 +67,7 @@ async fn main() -> cmd::Result<()> {
     }
 
     // Get descriptors from loon db
-    let acct_id = args.account_id.unwrap_or(3);
+    let acct_id = args.account_id.unwrap_or(1);
     let db = rusqlite::Connection::open(DB_PATH)?;
 
     let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
@@ -145,7 +145,7 @@ async fn main() -> cmd::Result<()> {
     // Initialize tx graph
     let tx_graph = TxGraph::<ConfirmationBlockTime>::default();
 
-    let mut wallet = BdkChainWallet {
+    let mut wallet = BdkWallet {
         network,
         chain,
         tx_graph,

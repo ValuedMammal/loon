@@ -9,7 +9,7 @@ use nostr_sdk::NostrSigner;
 use crate::{
     bitcoincore_rpc, db,
     nostr_prelude::{self as nostr, FromBech32},
-    rusqlite, BdkChainWallet as Wallet, Error,
+    rusqlite, BdkWallet as Wallet, Error,
 };
 
 /// Coordinator

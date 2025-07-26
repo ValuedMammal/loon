@@ -60,7 +60,7 @@ impl fmt::Display for Keychain {
 
 /// Stores and indexes on-chain data
 #[derive(Debug, Clone)]
-pub struct BdkChainWallet {
+pub struct BdkWallet {
     /// network
     pub network: Network,
     /// local chain
@@ -73,7 +73,7 @@ pub struct BdkChainWallet {
     pub stage: BdkChangeSet,
 }
 
-impl BdkChainWallet {
+impl BdkWallet {
     /// Latest checkpoint tip
     pub fn tip(&self) -> CheckPoint {
         self.chain.tip()

@@ -142,7 +142,7 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
             let cp = coor.wallet().tip();
             let start_height = cp.height();
 
-            // Clone the keychains into a temporary tx graph. This is used to aggregate relevant
+            // Clone the keychains into a temporary tx graph. This is used to collect relevant
             // transactions during the sync.
             use bdk_chain::indexed_tx_graph::{self, IndexedTxGraph};
             let mut tmp_graph =
