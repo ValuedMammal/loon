@@ -18,7 +18,7 @@ use rand::Fill;
 use loon::bitcoincore_rpc::RpcApi;
 use loon::{
     bitcoincore_rpc, nostr_prelude::*, rusqlite, Account, BdkChangeSet, BdkWallet, Coordinator,
-    Friend, Keychain, BDK_CHAIN_DB_PATH, DB_PATH,
+    Friend, Keychain, BDK_DB_PATH, DB_PATH,
 };
 
 use cli::{Args, Cmd, GenerateSubCmd, WalletSubCmd};
@@ -113,9 +113,9 @@ async fn main() -> cmd::Result<()> {
         })
     })?;
 
-    // Load Bdk chain wallet for the intended quorum
+    // Load wallet for the intended quorum
     // TODO: the path to the wallet should match the account id of the quorum we're loading
-    let mut conn = rusqlite::Connection::open(BDK_CHAIN_DB_PATH)?;
+    let mut conn = rusqlite::Connection::open(BDK_DB_PATH)?;
     let mut tx = conn.transaction()?;
     let changeset = BdkChangeSet::initialize(&mut tx)?;
     tx.commit()?;

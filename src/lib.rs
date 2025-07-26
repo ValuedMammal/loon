@@ -14,7 +14,7 @@ pub use {
 };
 
 /// Bdk chain db path
-pub const BDK_CHAIN_DB_PATH: &str = "./chain.db";
+pub const BDK_DB_PATH: &str = "./wallet.db";
 /// Loon db path
 pub const DB_PATH: &str = "./loon.db";
 /// Human-readable part of a loon call
