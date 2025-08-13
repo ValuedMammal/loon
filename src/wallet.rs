@@ -150,7 +150,7 @@ impl BdkWallet {
     /// List wallet transactions
     pub fn transactions(
         &self,
-    ) -> impl Iterator<Item = CanonicalTx<Arc<Transaction>, ConfirmationBlockTime>> {
+    ) -> impl Iterator<Item = CanonicalTx<'_, Arc<Transaction>, ConfirmationBlockTime>> {
         self.tx_graph.list_canonical_txs(
             &self.chain,
             self.tip().block_id(),
