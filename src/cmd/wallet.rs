@@ -2,11 +2,11 @@ use std::str::FromStr;
 
 use bitcoin::{address::FromScriptError, Address, Amount, FeeRate};
 
-use bdk_bitcoind_rpc::bip158::{Event, EventInner, FilterIter};
 use bdk_chain::bdk_core;
 use bdk_chain::bitcoin;
 use bdk_chain::SpkIterator;
 use bdk_core::{BlockId, ConfirmationBlockTime, Merge, TxUpdate};
+use filter_iter::FilterIter;
 
 use loon::bitcoincore_rpc::RpcApi;
 use loon::{Coordinator, Keychain, Update};
@@ -139,9 +139,6 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                 }
             }
 
-            let cp = coor.wallet().tip();
-            let start_height = cp.height();
-
             // Clone the keychains into a temporary tx graph. This is used to collect relevant
             // transactions during the sync.
             use bdk_chain::indexed_tx_graph::{self, IndexedTxGraph};
@@ -149,8 +146,7 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                 IndexedTxGraph::<ConfirmationBlockTime, _>::new(coor.wallet().index.clone());
             let mut tmp_changeset = indexed_tx_graph::ChangeSet::default();
 
-            let mut emitter = FilterIter::new_with_checkpoint(coor.rpc_client(), cp);
-
+            let mut spks = vec![];
             for (keychain, desc) in coor.wallet().index.keychains() {
                 let last_reveal = coor
                     .wallet()
@@ -158,45 +154,49 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                     .last_revealed_index(keychain)
                     .unwrap_or_default()
                     .max(SPK_CT);
-                emitter.add_spks(
-                    SpkIterator::new_with_range(desc, 0..=last_reveal).map(|(_, spk)| spk),
-                );
+                spks.extend(SpkIterator::new_with_range(desc, 0..=last_reveal).map(|(_, s)| s));
             }
 
-            // Sync
-            if let Some(tip) = emitter.get_tip()? {
-                let blocks_to_scan = tip.height - start_height;
+            let cp = coor.wallet().tip();
+            let start_height = cp.height();
 
-                for event in emitter.by_ref() {
-                    let event = event?;
-                    let curr = event.height();
-                    if let Event::Block(EventInner { height, ref block }) = event {
-                        println!("Matched block {}", curr);
-                        tmp_changeset.merge(tmp_graph.apply_block_relevant(block, height));
-                    }
-                    if curr % 1000 == 0 {
-                        let progress = (curr - start_height) as f32 / blocks_to_scan as f32;
-                        println!("[{:.2}%]", progress * 100.0);
-                    }
+            let iter = FilterIter::new(coor.rpc_client(), cp.clone(), spks);
+
+            let mut tip = cp;
+            let mut tip_block_id = tip.block_id();
+
+            for res in iter {
+                let event = res?;
+                let block_id = event.cp.block_id();
+                let height = block_id.height;
+                // Update tip
+                if height <= start_height || event.is_match() {
+                    tip = tip.insert(block_id);
                 }
-
-                // Apply updates
-                let last_active_indices = tmp_graph.index.last_used_indices();
-                let tx_update: TxUpdate<_> = tmp_graph.graph().clone().into();
-                let cp = emitter.chain_update();
-
-                let index_changeset =
-                    coor.wallet.index.reveal_to_target_multi(&last_active_indices);
-                coor.wallet.stage(index_changeset);
-                coor.wallet.index_tx_graph_changeset(&tmp_changeset.tx_graph);
-                coor.wallet.apply_update(Update {
-                    tx_update,
-                    cp,
-                    ..Default::default()
-                })?;
-
-                coor.persist()?;
+                // Apply matching blocks
+                if let Some(ref block) = event.block {
+                    tmp_changeset.merge(tmp_graph.apply_block_relevant(block, height));
+                    println!("Matched block {height}");
+                }
+                tip_block_id = block_id;
             }
+
+            // Also include the new tip
+            tip = tip.insert(tip_block_id);
+
+            // Apply updates
+            let last_active_indices = tmp_graph.index.last_used_indices();
+            let tx_update: TxUpdate<_> = tmp_graph.graph().clone().into();
+            let index_changeset = coor.wallet.index.reveal_to_target_multi(&last_active_indices);
+            coor.wallet.stage(index_changeset);
+            coor.wallet.index_tx_graph_changeset(&tmp_changeset.tx_graph);
+            coor.wallet.apply_update(Update {
+                tx_update,
+                cp: Some(tip),
+                ..Default::default()
+            })?;
+
+            coor.persist()?;
 
             println!("Local tip: {}\n", coor.wallet().tip().height());
 
