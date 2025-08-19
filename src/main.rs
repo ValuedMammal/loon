@@ -86,13 +86,15 @@ async fn main() -> cmd::Result<()> {
         }
     };
 
-    let (desc, change_desc) = split_desc(&acct.descriptor);
-    if change_desc.is_empty() {
-        bail!("descriptor must be multipath");
-    }
+    let desc_str = &acct.descriptor;
     let secp = secp256k1::Secp256k1::new();
-    let desc = Descriptor::parse_descriptor(&secp, &desc)?.0;
-    let change_desc = Descriptor::parse_descriptor(&secp, &change_desc)?.0;
+    let desc = Descriptor::parse_descriptor(&secp, desc_str)?.0;
+    if !desc.is_multipath() {
+        bail!("Descriptor must be multipath");
+    }
+    let mut desc_iter = desc.into_single_descriptors()?.into_iter();
+    let desc = desc_iter.next().unwrap();
+    let change_desc = desc_iter.next().ok_or(anyhow::anyhow!("Missing change descriptor"))?;
     let did = desc.descriptor_id().to_string();
     let quorum_fp = &did[..8];
 
@@ -214,40 +216,4 @@ async fn main() -> cmd::Result<()> {
     }
 
     Ok(())
-}
-
-/// Split descriptor.
-fn split_desc(desc: &str) -> (String, String) {
-    use regex_lite::Captures;
-    use regex_lite::Regex;
-    let re = Regex::new(r"<([\d+]);([\d+])>").unwrap();
-    if !re.is_match(desc) {
-        return (desc.to_string(), String::new());
-    }
-
-    // find, replace
-    let rep = |caps: &Captures| -> String { caps.get(1).unwrap().as_str().to_string() };
-    let descriptor = re.replace_all(desc, &rep).to_string();
-    let rep = |caps: &Captures| -> String { caps.get(2).unwrap().as_str().to_string() };
-    let change_descriptor = re.replace_all(desc, &rep).to_string();
-
-    (descriptor, change_descriptor)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn split_descriptor() {
-        let desc = "wsh(multi(2,[7d94197e/84h/1h/0h]tpubDCmcN1ucMUfxxabEnLKHzUbjaxg8P4YR4V7mMsfhnsdRJquRyDTudrBmzZhrpV4Z4PH3MjKKFtBk6WkJbEWqL9Vc8E8v1tqFxtFXRY8zEjG/<0;1>/*,[9aa5b7ee/84h/1h/0h]tpubDCUB1aBPqtRaVXRpV6WT8RBKn6ZJhua9Uat8vvqfz2gD2zjSaGAasvKMsvcXHhCxrtv9T826vDpYRRhkU8DCRBxMd9Se3dzbScvcguWjcqF/<0;1>/*))";
-        let (desc, change_desc) = split_desc(desc);
-        assert!(!change_desc.is_empty());
-        for s in [desc, change_desc] {
-            assert!(!s.is_empty());
-            assert!(!s.contains(";"));
-            assert!(!s.contains("<"));
-            assert!(!s.contains(">"));
-        }
-    }
 }

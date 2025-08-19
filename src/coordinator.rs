@@ -17,7 +17,7 @@ use crate::{
 pub struct Coordinator {
     /// quorum fingerprint
     pub fingerprint: String,
-    /// Bdk chain wallet
+    /// Bdk wallet
     pub wallet: Wallet,
     /// database connection
     pub db: Arc<Mutex<rusqlite::Connection>>,
