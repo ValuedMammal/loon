@@ -434,3 +434,16 @@ fn single_random_draw() -> impl FnMut(&mut Selector) -> Result<(), anyhow::Error
         Ok(())
     }
 }
+
+/// Selection algorithm that selects candidates sorted smallest first.
+#[allow(unused)]
+fn smallest_first() -> impl FnMut(&mut Selector) -> Result<(), anyhow::Error> {
+    |selector| {
+        selector
+            .inner_mut()
+            .sort_candidates_by(|(_, a), (_, b)| a.value.cmp(&b.value));
+        selector.select_until_target_met()?;
+
+        Ok(())
+    }
+}
