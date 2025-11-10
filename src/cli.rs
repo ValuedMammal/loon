@@ -2,7 +2,7 @@ use clap::Parser;
 use clap::Subcommand;
 
 #[derive(Parser)]
-#[clap(author, about)]
+#[clap(author, about, version)]
 pub struct Args {
     /// Account id
     #[clap(long, short)]
