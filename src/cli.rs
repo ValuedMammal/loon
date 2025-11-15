@@ -1,3 +1,4 @@
+use bitcoin::{address::NetworkUnchecked, Address};
 use clap::Parser;
 use clap::Subcommand;
 
@@ -180,7 +181,7 @@ pub enum TxSubCmd {
     New {
         /// Recipient address
         #[clap(required = true)]
-        recipient: String,
+        recipient: Address<NetworkUnchecked>,
         /// Amount to send in satoshis
         #[clap(required = true)]
         value: u64,
