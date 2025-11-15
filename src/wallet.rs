@@ -1,12 +1,11 @@
-use std::cmp;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
-use bitcoin::key::rand::Rng;
 use bitcoin::{
-    absolute, key::rand, transaction, Address, Amount, FeeRate, Network, OutPoint, Psbt, Sequence,
-    Transaction,
+    absolute,
+    key::rand::{seq::SliceRandom, Rng},
+    transaction, Address, Amount, FeeRate, Network, Psbt, Sequence, Transaction,
 };
 use miniscript::plan::{Assets, Plan};
 use miniscript::ForEachKey;
@@ -24,8 +23,8 @@ use bdk_chain::{
 };
 
 use bdk_tx::{
-    group_by_spk, CanonicalUnspents, ChangePolicyType, InputCandidates, Output, PsbtParams,
-    Selector, SelectorParams, TxStatus,
+    ChangePolicyType, Input, InputCandidates, Output, PsbtParams, Selector, SelectorParams,
+    TxStatus,
 };
 
 mod changeset;
@@ -56,6 +55,14 @@ impl fmt::Display for Keychain {
             _ => self.0.fmt(f),
         }
     }
+}
+
+/// Structures for updating the wallet
+#[derive(Debug, Clone, Default)]
+pub struct Update {
+    pub tx_update: TxUpdate<ConfirmationBlockTime>,
+    pub cp: Option<CheckPoint>,
+    pub last_active_indices: BTreeMap<Keychain, u32>,
 }
 
 /// Stores and indexes on-chain data
@@ -314,7 +321,7 @@ impl BdkWallet {
         }
     }
 
-    /// Assets
+    /// Return the "keys" assets for every descriptor of this wallet.
     fn assets(&self) -> Assets {
         let mut v = vec![];
         for (_, desc) in self.index.keychains() {
@@ -326,23 +333,32 @@ impl BdkWallet {
         Assets::new().add(v)
     }
 
-    /// Return the input candidates
-    fn input_candidates(&self) -> bdk_tx::InputCandidates {
-        let assets = self.assets();
-        let chain = &self.chain;
-        let indexer = &self.index;
-        let txs_with_status = self
-            .tx_graph
-            .list_canonical_txs(chain, chain.tip().block_id(), CanonicalizationParams::default())
-            .map(|c_tx| (c_tx.tx_node.tx, status_from_position(c_tx.chain_position)));
-        let canon_utxos = CanonicalUnspents::new(txs_with_status);
-        let can_select = canon_utxos.try_get_unspents(
-            indexer
-                .outpoints()
-                .iter()
-                .filter_map(|&(_, op)| Some((op, try_plan(&self.index, op, &assets)?))),
-        );
-        InputCandidates::new([], can_select)
+    /// Try to plan the output of `outpoint` with the available `assets`
+    fn plan_input(
+        &self,
+        txo: KeychainIndexed<Keychain, FullTxOut<ConfirmationBlockTime>>,
+        assets: &Assets,
+    ) -> Option<Input> {
+        let plan = self.try_plan(&txo, assets)?;
+        let (_indexed, txo) = txo;
+        let prev_tx = self.tx_graph.get_tx(txo.outpoint.txid)?;
+        let status = status_from_position(txo.chain_position);
+        bdk_tx::Input::from_prev_tx(plan, prev_tx, txo.outpoint.vout as usize, status).ok()
+    }
+
+    /// Try to plan the output of `outpoint` with the available `assets`
+    fn try_plan(
+        &self,
+        txo: &KeychainIndexed<Keychain, FullTxOut<ConfirmationBlockTime>>,
+        assets: &Assets,
+    ) -> Option<Plan> {
+        let &((keychain, index), _) = txo;
+        let desc = self
+            .index
+            .get_descriptor(keychain)?
+            .at_derivation_index(index)
+            .expect("must be valid derivation index");
+        desc.plan(assets).ok()
     }
 
     /// Create PSBT.
@@ -351,10 +367,11 @@ impl BdkWallet {
         address: Address,
         amount: Amount,
         feerate: FeeRate,
+        rng: &mut impl Rng,
     ) -> anyhow::Result<Psbt> {
         let longterm_feerate = bitcoin::FeeRate::from_sat_per_vb_unchecked(8);
         let change_keychain = Keychain::INTERNAL;
-        let ((next_index, _), index_changeset) = self
+        let ((next_index, _), _) = self
             .index
             .next_unused_spk(change_keychain)
             .expect("keychain must exist");
@@ -364,7 +381,16 @@ impl BdkWallet {
             .cloned()
             .expect("must have descriptor");
 
-        let input_candidates = self.input_candidates().regroup(group_by_spk());
+        let assets = self.assets();
+
+        let mut can_select: Vec<Input> = self
+            .list_unspent()
+            .flat_map(|txo| self.plan_input(txo, &assets))
+            .collect();
+
+        can_select.shuffle(rng);
+
+        let input_candidates = InputCandidates::new(vec![], can_select);
 
         let output = match self.index.index_of_spk(address.script_pubkey()) {
             // If we have the recipient address indexed, we want to include the
@@ -391,7 +417,8 @@ impl BdkWallet {
             ),
         )?;
 
-        selector.select_with_algorithm(single_random_draw())?;
+        // TODO: Consider add coin selection strategy to the CLI.
+        selector.select_with_algorithm(select_to_target())?;
 
         let selection = selector.try_finalize().ok_or(anyhow::anyhow!("selection failed"))?;
 
@@ -402,23 +429,8 @@ impl BdkWallet {
             mandate_full_tx_for_segwit_v0: false,
         };
 
-        let psbt = selection.create_psbt(params)?;
-
-        if selector.has_change().unwrap_or(false) {
-            self.stage(index_changeset);
-            self.index.mark_used(change_keychain, next_index);
-        }
-
-        Ok(psbt)
+        Ok(selection.create_psbt(params)?)
     }
-}
-
-/// Structures for updating the wallet
-#[derive(Debug, Clone, Default)]
-pub struct Update {
-    pub tx_update: TxUpdate<ConfirmationBlockTime>,
-    pub cp: Option<CheckPoint>,
-    pub last_active_indices: BTreeMap<Keychain, u32>,
 }
 
 /// Create TxStatus from the given chain position (if confirmed).
@@ -440,31 +452,10 @@ fn status_from_position(pos: ChainPosition<ConfirmationBlockTime>) -> Option<TxS
     None
 }
 
-/// Try to plan the output of `outpoint` with the available `assets`
-fn try_plan(
-    indexer: &KeychainTxOutIndex<Keychain>,
-    outpoint: OutPoint,
-    assets: &Assets,
-) -> Option<Plan> {
-    let ((keychain, index), _) = indexer.txout(outpoint)?;
-    let desc = indexer
-        .get_descriptor(keychain)?
-        .at_derivation_index(index)
-        .expect("must be valid derivation index");
-    desc.plan(assets).ok()
-}
-
-/// Selection algorithm that sorts candidates randomly and selects until the target is met.
-fn single_random_draw() -> impl FnMut(&mut Selector) -> Result<(), anyhow::Error> {
-    let mut rng = rand::thread_rng();
-    move |selector| {
-        selector.inner_mut().sort_candidates_by(|_, _| {
-            if rng.gen_bool(0.5) {
-                cmp::Ordering::Greater
-            } else {
-                cmp::Ordering::Less
-            }
-        });
+/// Select from the available candidates until the target is met (if possible).
+#[allow(unused)]
+fn select_to_target() -> impl FnMut(&mut Selector) -> Result<(), anyhow::Error> {
+    |selector| {
         selector.select_until_target_met()?;
         Ok(())
     }
