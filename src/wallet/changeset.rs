@@ -86,3 +86,20 @@ impl From<keychain_txout::ChangeSet> for BdkChangeSet {
         }
     }
 }
+
+impl From<(keychain_txout::ChangeSet, tx_graph::ChangeSet<ConfirmationBlockTime>)>
+    for BdkChangeSet
+{
+    fn from(
+        (indexer, tx_graph): (
+            keychain_txout::ChangeSet,
+            tx_graph::ChangeSet<ConfirmationBlockTime>,
+        ),
+    ) -> Self {
+        Self {
+            indexer,
+            tx_graph,
+            ..Default::default()
+        }
+    }
+}

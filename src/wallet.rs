@@ -198,6 +198,41 @@ impl BdkWallet {
         Some(((keychain, index), addr))
     }
 
+    /// Apply relevant transactions in `block` of `height` to the wallet.
+    ///
+    /// This will index all of the transaction data in the block, and insert
+    /// relevant ones into the tx-graph with its confirmation block anchor.
+    ///
+    /// **You must persist the staged changes**.
+    pub fn apply_block_relevant(&mut self, block: &bitcoin::Block, height: u32) {
+        use bdk_chain::keychain_txout;
+        use bdk_chain::tx_graph;
+        let mut index_changeset = keychain_txout::ChangeSet::default();
+        let mut tx_graph_changeset = tx_graph::ChangeSet::<ConfirmationBlockTime>::default();
+
+        let anchor = ConfirmationBlockTime {
+            block_id: BlockId {
+                height,
+                hash: block.block_hash(),
+            },
+            confirmation_time: block.header.time as u64,
+        };
+
+        for tx in &block.txdata {
+            // Index tx data. If it's not relevant that's fine, the changeset
+            // will just be empty.
+            index_changeset.merge(self.index.index_tx(tx));
+
+            // Insert relevant transactions with confirmation anchor.
+            if self.index.is_tx_relevant(tx) {
+                tx_graph_changeset.merge(self.tx_graph.insert_tx(tx.clone()));
+                tx_graph_changeset.merge(self.tx_graph.insert_anchor(tx.compute_txid(), anchor));
+            }
+        }
+
+        self.stage((index_changeset, tx_graph_changeset));
+    }
+
     /// Apply an [`Update`]. This stages the change to be persisted later.
     ///
     /// Errors if the chain update fails.
