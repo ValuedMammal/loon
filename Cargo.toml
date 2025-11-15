@@ -1,6 +1,6 @@
 [package]
 name = "loon"
-version = "0.1.0"
+version = "0.1.0-alpha"
 authors = ["ValuedMammal <valuedmammal@protonmail.com>"]
 edition = "2021"
 description = "Loon wallet - coordination at a distance"
