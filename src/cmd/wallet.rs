@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
-use bitcoin::{address::FromScriptError, Address, Amount, FeeRate};
-
+use anyhow::Context;
 use bdk_chain::bdk_core;
 use bdk_chain::bitcoin;
 use bdk_chain::SpkIterator;
-use bdk_core::{BlockId, ConfirmationBlockTime, Merge, TxUpdate};
+use bdk_core::BlockId;
+use bitcoin::{address::FromScriptError, Address, Amount, FeeRate};
 use filter_iter::FilterIter;
 
-use loon::{Coordinator, Keychain, Update};
+use loon::{simplerpc, Coordinator, Keychain, Update};
 
 use super::Result;
 use crate::cli::{AddressSubCmd, TxSubCmd, WalletSubCmd};
@@ -138,13 +138,6 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                 }
             }
 
-            // Clone the keychains into a temporary tx graph. This is used to collect relevant
-            // transactions during the sync.
-            use bdk_chain::indexed_tx_graph::{self, IndexedTxGraph};
-            let mut tmp_graph =
-                IndexedTxGraph::<ConfirmationBlockTime, _>::new(coor.wallet().index.clone());
-            let mut tmp_changeset = indexed_tx_graph::ChangeSet::default();
-
             let mut spks = vec![];
             for (keychain, desc) in coor.wallet().index.keychains() {
                 let last_reveal = coor
@@ -156,49 +149,40 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                 spks.extend(SpkIterator::new_with_range(desc, 0..=last_reveal).map(|(_, s)| s));
             }
 
-            let cp = coor.wallet().tip();
+            let mut cp = coor.wallet().tip();
             let start_height = cp.height();
+            let rpc_client = get_rpc_client(network)?;
+            let filter_iter = FilterIter::new(&rpc_client, cp.clone(), spks);
+            let mut new_tip = cp.block_id();
 
-            let iter = FilterIter::new(coor.rpc_client(), cp.clone(), spks);
-
-            let mut tip = cp;
-            let mut tip_block_id = tip.block_id();
-
-            for res in iter {
-                let event = res?;
+            for result in filter_iter {
+                let event = result?;
                 let block_id = event.cp.block_id();
                 let height = block_id.height;
-                // Update tip
+                // Add matching blocks to tip (including those that may have been reorganized).
                 if height <= start_height || event.is_match() {
-                    tip = tip.insert(block_id);
+                    cp = cp.insert(block_id);
                 }
                 // Apply matching blocks
                 if let Some(ref block) = event.block {
-                    tmp_changeset.merge(tmp_graph.apply_block_relevant(block, height));
+                    coor.wallet_mut().apply_block_relevant(block, height);
                     println!("Matched block {height}");
                 }
-                tip_block_id = block_id;
+                new_tip = block_id;
             }
 
-            // Also include the new tip
-            tip = tip.insert(tip_block_id);
+            // Also include the new tip.
+            cp = cp.insert(new_tip);
 
-            // Apply updates
-            let last_active_indices = tmp_graph.index.last_used_indices();
-            let tx_update: TxUpdate<_> = tmp_graph.graph().clone().into();
-            let index_changeset = coor.wallet.index.reveal_to_target_multi(&last_active_indices);
-            coor.wallet.stage(index_changeset);
-            coor.wallet.index_tx_graph_changeset(&tmp_changeset.tx_graph);
+            // Apply chain update.
             coor.wallet.apply_update(Update {
-                tx_update,
-                cp: Some(tip),
+                cp: Some(cp),
                 ..Default::default()
             })?;
 
             coor.persist()?;
 
             println!("Local tip: {}\n", coor.wallet().tip().height());
-
             display_balance(coor)?;
         }
     }
@@ -214,7 +198,7 @@ fn display_balance(coor: &Coordinator) -> Result<()> {
 
     let unspent: Vec<_> = wallet.list_unspent().collect();
 
-    // list unspent
+    // List unspent.
     if !unspent.is_empty() {
         println!("Unspent");
         for (indexed, txo) in unspent {
@@ -232,8 +216,27 @@ fn display_balance(coor: &Coordinator) -> Result<()> {
         }
     }
 
-    // display Balance
+    // Display Balance.
     println!("\n{:#?}", wallet.balance());
 
     Ok(())
+}
+
+/// Initialize a new RPC client. This is here to avoid holding a reference to the
+/// Coordinator's client while we're mutating the wallet.
+fn get_rpc_client(network: bitcoin::Network) -> anyhow::Result<simplerpc::Client> {
+    let rpc_port = match network {
+        bitcoin::Network::Signet => 38332,
+        bitcoin::Network::Bitcoin => 8332,
+        _ => panic!("unsupported Network"),
+    };
+    let url = format!("http://127.0.0.1:{rpc_port}");
+    let cookie_file = std::env::var("RPC_COOKIE").context("must set RPC_COOKIE")?;
+    let cookie = std::fs::read_to_string(cookie_file)?;
+    let simple_http = simplerpc::jsonrpc::simple_http::Builder::new()
+        .url(&url)?
+        .cookie_auth(cookie)
+        .build();
+
+    Ok(simplerpc::Client::with_transport(simple_http))
 }
