@@ -8,7 +8,6 @@ use bdk_chain::SpkIterator;
 use bdk_core::{BlockId, ConfirmationBlockTime, Merge, TxUpdate};
 use filter_iter::FilterIter;
 
-use loon::bitcoincore_rpc::RpcApi;
 use loon::{Coordinator, Keychain, Update};
 
 use super::Result;

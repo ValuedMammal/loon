@@ -15,10 +15,11 @@ use bdk_chain::{
 use clap::Parser;
 use rand::Fill;
 
-use loon::bitcoincore_rpc::RpcApi;
 use loon::{
-    bitcoincore_rpc, nostr_prelude::*, rusqlite, Account, BdkChangeSet, BdkWallet, Coordinator,
-    Friend, Keychain, BDK_DB_PATH, DB_PATH,
+    nostr_prelude::*,
+    rusqlite,
+    simplerpc::{self, jsonrpc},
+    Account, BdkChangeSet, BdkWallet, Coordinator, Friend, Keychain, BDK_DB_PATH, DB_PATH,
 };
 
 use cli::{Args, Cmd, GenerateSubCmd, WalletSubCmd};
@@ -163,8 +164,13 @@ async fn main() -> cmd::Result<()> {
     // Configure core rpc
     let url = format!("http://127.0.0.1:{rpc_port}");
     let cookie_file = env::var("RPC_COOKIE").context("must set RPC_COOKIE")?;
-    let auth = bitcoincore_rpc::Auth::CookieFile(cookie_file.into());
-    let rpc_client = bitcoincore_rpc::Client::new(&url, auth)?;
+    let cookie = std::fs::read_to_string(cookie_file)?;
+    let simple_http = jsonrpc::simple_http::Builder::new()
+        .url(&url)
+        .unwrap()
+        .cookie_auth(cookie)
+        .build();
+    let rpc_client = simplerpc::Client::with_transport(simple_http);
 
     // Configure nostr client if needed
     let client = match &args.cmd {
@@ -199,7 +205,6 @@ async fn main() -> cmd::Result<()> {
 
     match args.cmd {
         Cmd::Db(_) => unreachable!("handled above"),
-        Cmd::Desc(subcmd) => cmd::descriptor::execute(&coordinator, subcmd)?,
         Cmd::Call(subcmd) => cmd::call::push(&coordinator, subcmd).await?,
         Cmd::Fetch { listen } => {
             if listen {

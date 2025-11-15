@@ -7,9 +7,9 @@ use bdk_chain::bitcoin;
 use nostr_sdk::NostrSigner;
 
 use crate::{
-    bitcoincore_rpc, db,
+    db,
     nostr_prelude::{self as nostr, FromBech32},
-    rusqlite, BdkWallet as Wallet, Error,
+    rusqlite, simplerpc, BdkWallet as Wallet, Error,
 };
 
 /// Coordinator
@@ -26,7 +26,7 @@ pub struct Coordinator {
     // Nostr client
     pub client: Option<Arc<nostr::Client>>,
     // RPC client
-    pub rpc_client: bitcoincore_rpc::Client,
+    pub rpc_client: simplerpc::Client,
 }
 
 impl Coordinator {
@@ -66,7 +66,7 @@ impl Coordinator {
     }
 
     /// Get a reference to the blockchain RPC client.
-    pub fn rpc_client(&self) -> &bitcoincore_rpc::Client {
+    pub fn rpc_client(&self) -> &simplerpc::Client {
         &self.rpc_client
     }
 

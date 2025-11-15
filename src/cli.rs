@@ -19,9 +19,9 @@ pub enum Cmd {
     /// Database operations.
     #[clap(subcommand)]
     Db(DbSubCmd),
-    /// Descriptors operations.
-    #[clap(subcommand)]
-    Desc(DescSubCmd),
+    // TODO: Descriptors operations.
+    // #[clap(subcommand)]
+    // Desc(DescSubCmd),
     /// Fetch notes from quorum participants.
     Fetch {
         /// Poll for new notes continuously.
