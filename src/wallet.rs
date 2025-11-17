@@ -3,9 +3,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use bitcoin::{
-    absolute,
-    key::rand::{seq::SliceRandom, Rng},
-    transaction, Address, Amount, FeeRate, Network, Psbt, Sequence, Transaction,
+    absolute, key::rand::seq::SliceRandom, transaction, Address, Amount, FeeRate, Network, Psbt,
+    Sequence, Transaction,
 };
 use miniscript::plan::{Assets, Plan};
 use miniscript::ForEachKey;
@@ -367,8 +366,10 @@ impl BdkWallet {
         address: Address,
         amount: Amount,
         feerate: FeeRate,
-        rng: &mut impl Rng,
+        sweep: bool,
     ) -> anyhow::Result<Psbt> {
+        let mut rng = bitcoin::key::rand::thread_rng();
+
         let longterm_feerate = bitcoin::FeeRate::from_sat_per_vb_unchecked(8);
         let change_keychain = Keychain::INTERNAL;
         let ((next_index, _), _) = self
@@ -388,31 +389,54 @@ impl BdkWallet {
             .flat_map(|txo| self.plan_input(txo, &assets))
             .collect();
 
-        can_select.shuffle(rng);
+        can_select.shuffle(&mut rng);
 
-        let input_candidates = InputCandidates::new(vec![], can_select);
+        let mut must_select = vec![];
+        if sweep {
+            must_select = core::mem::take(&mut can_select);
+        }
+        let input_candidates = InputCandidates::new(must_select, can_select);
 
-        let output = match self.index.index_of_spk(address.script_pubkey()) {
-            // If we have the recipient address indexed, we want to include the
-            // descriptor with the output so that it can be used to update the psbt.
-            Some(&(keychain, index)) => {
-                let desc = self
-                    .index
-                    .get_descriptor(keychain)
-                    .expect("must have descriptor")
-                    .at_derivation_index(index)?;
+        let recipient_index = self.index.index_of_spk(address.script_pubkey());
 
-                Output::with_descriptor(desc, amount)
-            }
-            None => Output::with_script(address.script_pubkey(), amount),
+        // If we're doing a sweep, then clear the recipient outputs and set
+        // the drain script to the given address.
+        // TODO: In bdk_tx 0.2 SelectorParams should take a ScriptSource
+        // which means we can drain to an address that may not belong
+        // to this wallet.
+        let (outputs, drain_script) = if sweep {
+            let Some(&(keychain, index)) = recipient_index else {
+                anyhow::bail!("Cannot sweep to a foreign address");
+            };
+            let descriptor = self
+                .index
+                .get_descriptor(keychain)
+                .unwrap()
+                .at_derivation_index(index)?;
+            (vec![], descriptor)
+        } else {
+            let output = match recipient_index {
+                // If we have the recipient address indexed, we want to include the
+                // descriptor with the output so that it can be used to update the psbt.
+                Some(&(keychain, index)) => {
+                    let desc = self
+                        .index
+                        .get_descriptor(keychain)
+                        .expect("must have descriptor")
+                        .at_derivation_index(index)?;
+                    Output::with_descriptor(desc, amount)
+                }
+                None => Output::with_script(address.script_pubkey(), amount),
+            };
+            (vec![output], change_desc.at_derivation_index(next_index)?)
         };
 
         let mut selector = Selector::new(
             &input_candidates,
             SelectorParams::new(
                 feerate,
-                vec![output],
-                change_desc.at_derivation_index(next_index)?,
+                outputs,
+                drain_script,
                 ChangePolicyType::NoDustAndLeastWaste { longterm_feerate },
             ),
         )?;

@@ -3,7 +3,7 @@ use bdk_chain::bdk_core;
 use bdk_chain::bitcoin;
 use bdk_chain::SpkIterator;
 use bdk_core::BlockId;
-use bitcoin::{address::FromScriptError, key::rand, Address, Amount, FeeRate};
+use bitcoin::{address::FromScriptError, Address, Amount, FeeRate};
 use filter_iter::FilterIter;
 
 use loon::{simplerpc, Coordinator, Keychain, Update};
@@ -74,8 +74,6 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                     println!("Txid: {}", canon_tx.tx_node.txid);
                 }
             }
-            // Sweep
-            TxSubCmd::Sweep { .. } => unimplemented!(),
             // Txout
             TxSubCmd::Out { unspent } => {
                 for (indexed, txo) in coor.wallet.list_indexed_txouts() {
@@ -101,14 +99,13 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                 recipient,
                 value,
                 feerate,
+                sweep,
             } => {
                 let address = recipient.require_network(network)?;
                 let amount = Amount::from_sat(value);
                 let feerate = FeeRate::from_sat_per_kwu((feerate * 250.0).round() as u64);
 
-                let psbt =
-                    coor.wallet
-                        .create_psbt(address, amount, feerate, &mut rand::thread_rng())?;
+                let psbt = coor.wallet.create_psbt(address, amount, feerate, sweep)?;
 
                 dbg!(&psbt);
                 println!("{}", psbt);

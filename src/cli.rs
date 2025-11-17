@@ -188,12 +188,9 @@ pub enum TxSubCmd {
         /// Feerate (sat/vb)
         #[clap(long, short, default_value = "1.2")]
         feerate: f32,
-    },
-    /// Send all
-    Sweep {
-        /// Recipient address
-        #[clap(required = true)]
-        recipient: String,
+        /// Send all
+        #[clap(long, short, default_value = "false")]
+        sweep: bool,
     },
     /// List transactions
     List,
