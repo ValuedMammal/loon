@@ -206,6 +206,7 @@ async fn main() -> cmd::Result<()> {
     match args.cmd {
         Cmd::Db(_) => unreachable!("handled above"),
         Cmd::Call(subcmd) => cmd::call::push(&coordinator, subcmd).await?,
+        Cmd::Desc(subcmd) => cmd::descriptor::execute(&coordinator, subcmd)?,
         Cmd::Fetch { listen } => {
             if listen {
                 cmd::fetch::listen(&coordinator).await?;

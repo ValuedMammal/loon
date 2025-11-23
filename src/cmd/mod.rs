@@ -3,8 +3,7 @@
 
 pub mod call;
 pub mod db;
-// TODO: Bring back support for descriptor command.
-// pub mod descriptor;
+pub mod descriptor;
 pub mod fetch;
 pub mod wallet;
 

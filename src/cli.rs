@@ -20,9 +20,9 @@ pub enum Cmd {
     /// Database operations.
     #[clap(subcommand)]
     Db(DbSubCmd),
-    // TODO: Descriptors operations.
-    // #[clap(subcommand)]
-    // Desc(DescSubCmd),
+    /// Descriptors operations.
+    #[clap(subcommand)]
+    Desc(DescSubCmd),
     /// Fetch notes from quorum participants.
     Fetch {
         /// Poll for new notes continuously.
@@ -71,18 +71,21 @@ pub struct CallOpt {
 
 #[derive(Subcommand)]
 pub enum DescSubCmd {
-    /// Import descriptors to Bitcoin Core
+    /// Import a descriptor to Bitcoin Core
     Import {
-        /// Descriptor
+        /// Descriptor string
         #[arg(required = true)]
         desc: String,
-        /// Internal flag
-        #[clap(long, short = 'i')]
+        /// Time when the descriptor became active. [default: "now"].
+        #[clap(long, short)]
+        timestamp: Option<u64>,
+        /// Denotes the descriptor should only be used for change.
+        #[clap(long, short)]
         internal: bool,
     },
     /// Get descriptor info
     Info {
-        /// Descriptor
+        /// Descriptor string
         #[arg(required = true)]
         desc: String,
     },
