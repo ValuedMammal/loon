@@ -9,7 +9,11 @@ pub use db::*;
 pub use wallet::*;
 
 // Re-exports
-pub use {bdk_chain::rusqlite, filter_iter::{self, simplerpc}, nostr_sdk::prelude as nostr_prelude};
+pub use {
+    bdk_chain::rusqlite,
+    filter_iter::{self, simplerpc},
+    nostr_sdk::prelude as nostr_prelude,
+};
 
 /// Bdk chain db path
 pub const BDK_DB_PATH: &str = "./wallet.db";
