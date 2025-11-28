@@ -90,12 +90,9 @@ async fn main() -> cmd::Result<()> {
     let desc_str = &acct.descriptor;
     let secp = secp256k1::Secp256k1::new();
     let desc = Descriptor::parse_descriptor(&secp, desc_str)?.0;
-    if !desc.is_multipath() {
-        bail!("Descriptor must be multipath");
-    }
     let mut desc_iter = desc.into_single_descriptors()?.into_iter();
     let desc = desc_iter.next().unwrap();
-    let change_desc = desc_iter.next().ok_or(anyhow::anyhow!("Missing change descriptor"))?;
+    let change_desc = desc_iter.next();
     let did = desc.descriptor_id().to_string();
     let quorum_fp = &did[..8];
 
@@ -144,7 +141,9 @@ async fn main() -> cmd::Result<()> {
     // Initialize txout index
     let mut index = KeychainTxOutIndex::<Keychain>::default();
     assert!(index.insert_descriptor(Keychain::EXTERNAL, desc)?);
-    assert!(index.insert_descriptor(Keychain::INTERNAL, change_desc)?);
+    if let Some(change_desc) = change_desc {
+        assert!(index.insert_descriptor(Keychain::INTERNAL, change_desc)?);
+    }
     // Initialize tx graph
     let tx_graph = TxGraph::<ConfirmationBlockTime>::default();
 
