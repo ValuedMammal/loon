@@ -164,6 +164,8 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
                 if let Some(ref block) = event.block {
                     coor.wallet_mut().apply_block_relevant(block, height);
                     println!("Matched block {height}");
+                } else if height % 100 == 0 {
+                    println!("Scanning.. {height}");
                 }
                 new_tip = block_id;
             }
