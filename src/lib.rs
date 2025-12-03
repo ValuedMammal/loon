@@ -15,9 +15,9 @@ pub use {
     nostr_sdk::prelude as nostr_prelude,
 };
 
-/// Bdk chain db path
+/// Path to BDK wallet database.
 pub const BDK_DB_PATH: &str = "./wallet.db";
-/// Loon db path
+/// Path to Loon database.
 pub const DB_PATH: &str = "./loon.db";
 /// Human-readable part of a loon call
 pub const HRP: &str = "loon1";

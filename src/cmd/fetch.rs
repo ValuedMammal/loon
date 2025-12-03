@@ -12,7 +12,7 @@ use loon::Coordinator;
 use super::nostr::{EventId, Filter, Kind, PublicKey, Timestamp};
 use super::Result;
 
-/// How far to look back in time when polling the relay, currently one fortnight.
+/// How far to look back in seconds when polling the relay, currently one fortnight.
 const DEFAULT_LOOKBACK: u64 = 14 * 24 * 60 * 60;
 
 /// Encrypted content and author keyed by `EventId`.
