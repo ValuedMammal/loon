@@ -36,7 +36,7 @@ async fn fetch_raw_entries(coordinator: &Coordinator) -> Result<RawEntries> {
 
     let subs = Filter::new()
         .pubkeys(coordinator.participants().map(|(_, p)| p.pk))
-        .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
+        .since((Timestamp::now().as_secs() - DEFAULT_LOOKBACK).into());
 
     let events = client.fetch_events(subs, super::TIMEOUT).await?;
 
@@ -145,23 +145,4 @@ pub async fn listen(coordinator: &Coordinator) -> Result<()> {
         // refresh on 10s interval
         time::sleep(Duration::from_secs(10)).await;
     }
-}
-
-/// Fetch events from quorum participants.
-#[allow(unused)]
-pub async fn fetch(coordinator: Coordinator) -> Result<()> {
-    let client = coordinator.client().expect("must have client");
-    client.connect().await;
-
-    let subs = Filter::new()
-        .pubkeys(coordinator.participants().map(|(_id, p)| p.pk))
-        .since((Timestamp::now().as_u64() - DEFAULT_LOOKBACK).into());
-    let events = client.fetch_events(subs, super::TIMEOUT).await?;
-    for event in events {
-        if let Kind::TextNote = event.kind {
-            println!("{}", event.content);
-        }
-    }
-
-    Ok(())
 }
