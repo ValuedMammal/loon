@@ -9,10 +9,12 @@ pub use db::*;
 pub use wallet::*;
 
 // Re-exports
+#[cfg(feature = "nostr-sdk")]
+pub use nostr_sdk;
 pub use {
     bdk_chain::rusqlite,
+    bitcoin::secp256k1::rand,
     filter_iter::{self, simplerpc},
-    nostr_sdk::prelude as nostr_prelude,
 };
 
 /// Path to BDK wallet database.
@@ -28,6 +30,7 @@ pub enum Error {
     /// Coordinator
     Coordinator(String),
     /// Nostr client
+    #[cfg(feature = "nostr-sdk")]
     Nostr(nostr_sdk::client::Error),
 }
 
@@ -35,6 +38,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Coordinator(e) => e.fmt(f),
+            #[cfg(feature = "nostr-sdk")]
             Self::Nostr(e) => e.fmt(f),
         }
     }

@@ -16,6 +16,7 @@ pub struct Args {
 pub enum Cmd {
     /// Push notes.
     #[clap(subcommand)]
+    #[cfg(feature = "nostr-sdk")]
     Call(CallSubCmd),
     /// Database operations.
     #[clap(subcommand)]
@@ -24,6 +25,7 @@ pub enum Cmd {
     #[clap(subcommand)]
     Desc(DescSubCmd),
     /// Fetch notes from quorum participants.
+    #[cfg(feature = "nostr-sdk")]
     Fetch {
         /// Poll for new notes continuously.
         #[clap(long, short = 'l')]
@@ -40,6 +42,7 @@ pub enum Cmd {
 }
 
 #[derive(Subcommand)]
+#[cfg(feature = "nostr-sdk")]
 pub enum CallSubCmd {
     /// Construct a new private note.
     New(CallOpt),
@@ -125,6 +128,7 @@ pub enum DbSubCmd {
 #[derive(Subcommand)]
 pub enum GenerateSubCmd {
     /// Generate nostr keys
+    #[cfg(feature = "nostr-sdk")]
     Nsec,
     /// Generate a random WIF private key
     Wif {
@@ -152,6 +156,7 @@ pub enum WalletSubCmd {
     #[clap(subcommand)]
     Tx(TxSubCmd),
     /// Display the alias for the current user.
+    #[cfg(feature = "nostr-sdk")]
     Whoami,
 }
 

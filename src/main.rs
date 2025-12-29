@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -13,16 +12,17 @@ use bdk_chain::{
     DescriptorExt, TxGraph,
 };
 use clap::Parser;
-use rand::Fill;
 
 use loon::{
-    nostr_prelude::*,
+    rand::{self, Fill},
     rusqlite,
     simplerpc::{self, jsonrpc},
-    Account, BdkChangeSet, BdkWallet, Coordinator, Friend, Keychain, BDK_DB_PATH, DB_PATH,
+    Account, BdkChangeSet, BdkWallet, Coordinator, Keychain, BDK_DB_PATH, DB_PATH,
 };
+#[cfg(feature = "nostr-sdk")]
+use nostr_sdk::prelude::*;
 
-use cli::{Args, Cmd, GenerateSubCmd, WalletSubCmd};
+use cli::{Args, Cmd, GenerateSubCmd};
 use cmd::{bail, Context};
 
 mod cli;
@@ -39,6 +39,7 @@ async fn main() -> cmd::Result<()> {
             return Ok(());
         }
         Cmd::Generate(cmd) => match cmd {
+            #[cfg(feature = "nostr-sdk")]
             GenerateSubCmd::Nsec => {
                 let keys = Keys::generate();
                 println!("{}", keys.public_key.to_bech32()?);
@@ -102,17 +103,6 @@ async fn main() -> cmd::Result<()> {
         _ => bail!("unsupported network"),
     };
 
-    // Get friends from loon db
-    let mut stmt = db.prepare("SELECT * FROM friend WHERE account_id = ?1")?;
-    let friends = stmt.query_map([acct.id], |row| {
-        Ok(Friend {
-            account_id: row.get(0)?,
-            quorum_id: row.get(1)?,
-            npub: row.get(2)?,
-            alias: row.get(3)?,
-        })
-    })?;
-
     // Load wallet for the intended quorum
     // TODO: the path to the wallet should match the account id of the quorum we're loading
     let mut conn = rusqlite::Connection::open(BDK_DB_PATH)?;
@@ -171,41 +161,61 @@ async fn main() -> cmd::Result<()> {
         .build();
     let rpc_client = simplerpc::Client::with_transport(simple_http);
 
-    // Configure nostr client if needed
-    let client = match &args.cmd {
-        Cmd::Call(_) | Cmd::Fetch { .. } | Cmd::Wallet(WalletSubCmd::Whoami) => {
-            let nsec = Keys::parse(&env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
-            let client = Client::builder().signer(nsec).build();
-            client.add_relay("wss://relay.damus.io").await?;
-            Some(Arc::new(client))
+    // Initialize Coordinator
+    #[cfg(not(feature = "nostr-sdk"))]
+    let mut coordinator = {
+        Coordinator {
+            fingerprint: quorum_fp.to_string(),
+            wallet,
+            db: Arc::new(Mutex::new(conn)),
+            rpc_client,
         }
-        _ => None,
+    };
+    #[cfg(feature = "nostr-sdk")]
+    let mut coordinator = {
+        // Get friends from loon db
+        let mut stmt = db.prepare("SELECT * FROM friend WHERE account_id = ?1")?;
+        let friends = stmt.query_map([acct.id], |row| {
+            Ok(loon::Friend {
+                account_id: row.get(0)?,
+                quorum_id: row.get(1)?,
+                npub: row.get(2)?,
+                alias: row.get(3)?,
+            })
+        })?;
+
+        // Initialize nostr client
+        let nsec = Keys::parse(&env::var("NOSTR_NSEC").context("must set NOSTR_NSEC")?)?;
+        let client = Client::builder().signer(nsec).build();
+        client.add_relay("wss://relay.damus.io").await?;
+
+        let mut coordinator = Coordinator {
+            fingerprint: quorum_fp.to_string(),
+            wallet,
+            participants: std::collections::BTreeMap::new(),
+            client: Arc::new(client),
+            db: Arc::new(Mutex::new(conn)),
+            rpc_client,
+        };
+
+        // Add quorum participants
+        for friend_res in friends {
+            let friend = friend_res?;
+            coordinator.add_participant(friend.quorum_id, friend);
+        }
+        coordinator
     };
 
-    let db = Arc::new(Mutex::new(conn));
-
-    // init coordinator
-    let mut coordinator = Coordinator {
-        fingerprint: quorum_fp.to_string(),
-        wallet,
-        db,
-        participants: BTreeMap::new(),
-        client,
-        rpc_client,
-    };
-    // add quorum participants
-    for friend_res in friends {
-        let f = friend_res?;
-        coordinator.add_participant(f.quorum_id, f);
-    }
     // Persist the just staged change if this is the first time
     // creating a wallet
     coordinator.persist()?;
 
     match args.cmd {
         Cmd::Db(_) => unreachable!("handled above"),
+        #[cfg(feature = "nostr-sdk")]
         Cmd::Call(subcmd) => cmd::call::push(&coordinator, subcmd).await?,
         Cmd::Desc(subcmd) => cmd::descriptor::execute(&coordinator, subcmd)?,
+        #[cfg(feature = "nostr-sdk")]
         Cmd::Fetch { listen } => {
             if listen {
                 cmd::fetch::listen(&coordinator).await?;

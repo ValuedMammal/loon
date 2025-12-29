@@ -112,6 +112,7 @@ pub async fn execute(coor: &mut Coordinator, subcmd: WalletSubCmd) -> Result<()>
             }
         },
         // Display the person alias for the current user.
+        #[cfg(feature = "nostr-sdk")]
         WalletSubCmd::Whoami => {
             let my_pk = coor.signer().await?.get_public_key().await?;
 

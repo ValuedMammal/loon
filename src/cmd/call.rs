@@ -1,8 +1,9 @@
 use loon::CallTy;
 use loon::Coordinator;
 
+use nostr_sdk::{EventBuilder, Kind};
+
 use super::bail;
-use super::nostr::{EventBuilder, Kind};
 use super::Result;
 use crate::cli::CallOpt;
 use crate::cli::CallSubCmd;
@@ -13,7 +14,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
     match cmd {
         // Push a plain text note.
         CallSubCmd::Push { note } => {
-            let client = coordinator.client().expect("must have client");
+            let client = coordinator.client();
             client.connect().await;
             let event = client
                 .send_event_builder(EventBuilder::new(Kind::TextNote, note))
@@ -38,7 +39,8 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
 
             let p = if let Some(id) = id {
                 coordinator
-                    .get(id)
+                    .participants
+                    .get(&id.into())
                     .ok_or(anyhow::anyhow!("unknown participant id {}", id))?
             } else {
                 let alias = alias.expect("must have alias");
@@ -71,7 +73,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             if params.dryrun {
                 println!("Preview: {:#?}", &call);
             } else {
-                let client = coordinator.client().expect("must have client");
+                let client = coordinator.client();
                 client.connect().await;
                 let event = client
                     .send_event_builder(EventBuilder::new(Kind::TextNote, call.to_string()))

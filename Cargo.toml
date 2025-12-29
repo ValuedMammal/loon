@@ -13,10 +13,14 @@ bitcoin = { version = "0.32.7", features = ["base64", "rand-std"] }
 bdk_chain = { version = "0.23.2", features = ["rusqlite"] }
 bdk_tx = { version = "0.1.0" }
 clap = { version = "4.5", features = ["derive"] }
-nostr-sdk = { version = "0.44.1", features = ["nip44"] }
+nostr-sdk = { version = "0.44.1", features = ["nip44"], optional = true }
 tokio = { version = "1", features = ["full"] }
 
 [dependencies.filter_iter]
 git = "https://github.com/ValuedMammal/filter-iter"
 branch = "master"
 # path = "../filter-iter"
+
+[features]
+default = []
+nostr-sdk = ["dep:nostr-sdk"]

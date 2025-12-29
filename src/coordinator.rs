@@ -1,16 +1,14 @@
-use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use bdk_chain::bitcoin;
 
-use nostr_sdk::NostrSigner;
+#[cfg(feature = "nostr-sdk")]
+use nostr_sdk::prelude::{self as nostr, *};
 
-use crate::{
-    db,
-    nostr_prelude::{self as nostr, FromBech32},
-    rusqlite, simplerpc, BdkWallet as Wallet, Error,
-};
+#[allow(unused_imports)]
+use crate::Error;
+use crate::{rusqlite, simplerpc, BdkWallet as Wallet};
 
 /// Coordinator
 #[derive(Debug)]
@@ -22,22 +20,20 @@ pub struct Coordinator {
     /// database connection
     pub db: Arc<Mutex<rusqlite::Connection>>,
     /// quorum participants by id
-    pub participants: BTreeMap<Pid, Participant>,
+    #[cfg(feature = "nostr-sdk")]
+    pub participants: std::collections::BTreeMap<Pid, Participant>,
     // Nostr client
-    pub client: Option<Arc<nostr::Client>>,
+    #[cfg(feature = "nostr-sdk")]
+    pub client: Arc<nostr::Client>,
     // RPC client
     pub rpc_client: simplerpc::Client,
 }
 
 impl Coordinator {
     /// Add a `Participant`.
+    #[cfg(feature = "nostr-sdk")]
     pub fn add_participant(&mut self, pid: impl Into<Pid>, participant: impl Into<Participant>) {
         self.participants.insert(pid.into(), participant.into());
-    }
-
-    /// Get a `Participant`.
-    pub fn get(&self, pid: impl Into<Pid>) -> Option<&Participant> {
-        self.participants.get(&pid.into())
     }
 
     /// Get the wallet network.
@@ -56,12 +52,14 @@ impl Coordinator {
     }
 
     /// Get an iterator over the quorum participants.
+    #[cfg(feature = "nostr-sdk")]
     pub fn participants(&self) -> impl Iterator<Item = (&Pid, &Participant)> {
         self.participants.iter()
     }
 
     /// Get a reference to the nostr client.
-    pub fn client(&self) -> Option<Arc<nostr::Client>> {
+    #[cfg(feature = "nostr-sdk")]
+    pub fn client(&self) -> Arc<nostr::Client> {
         self.client.clone()
     }
 
@@ -71,11 +69,9 @@ impl Coordinator {
     }
 
     /// Get nostr signer.
+    #[cfg(feature = "nostr-sdk")]
     pub async fn signer(&self) -> Result<Arc<dyn NostrSigner>, Error> {
-        match &self.client {
-            Some(client) => client.signer().await.map_err(Error::Nostr),
-            None => Err(Error::Coordinator("no nostr client is configured".to_string())),
-        }
+        self.client.signer().await.map_err(Error::Nostr)
     }
 
     /// Returns the unique fingerprint of the active quorum.
@@ -106,6 +102,7 @@ impl Coordinator {
 
 /// A participant in a quorum.
 #[derive(Debug)]
+#[cfg(feature = "nostr-sdk")]
 pub struct Participant {
     pub pk: nostr_sdk::PublicKey,
     pub alias: Option<String>,
@@ -113,8 +110,9 @@ pub struct Participant {
     pub quorum_id: Pid,
 }
 
-impl From<db::Friend> for Participant {
-    fn from(friend: db::Friend) -> Self {
+#[cfg(feature = "nostr-sdk")]
+impl From<crate::Friend> for Participant {
+    fn from(friend: crate::Friend) -> Self {
         let pk = nostr_sdk::PublicKey::from_bech32(&friend.npub).expect("must have valid npub");
         Self {
             pk,
