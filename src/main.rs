@@ -17,7 +17,7 @@ use loon::{
     rand::{self, Fill},
     rusqlite,
     simplerpc::{self, jsonrpc},
-    Account, BdkChangeSet, BdkWallet, Coordinator, Keychain, BDK_DB_PATH, DB_PATH,
+    Account, BdkChangeSet, BdkWallet, Coordinator, Keychain, BDK_DB_PREFIX, LOON_DB_PATH,
 };
 #[cfg(feature = "nostr-sdk")]
 use nostr_sdk::prelude::*;
@@ -27,6 +27,9 @@ use cmd::{bail, Context};
 
 mod cli;
 mod cmd;
+
+/// Default account ID.
+const DEFAULT_ACCOUNT_ID: u32 = 1;
 
 #[tokio::main]
 async fn main() -> cmd::Result<()> {
@@ -69,11 +72,11 @@ async fn main() -> cmd::Result<()> {
     }
 
     // Get descriptors from loon db
-    let acct_id = args.account_id.unwrap_or(1);
-    let db = rusqlite::Connection::open(DB_PATH)?;
+    let account_id = args.account_id.unwrap_or(DEFAULT_ACCOUNT_ID);
+    let db = rusqlite::Connection::open(LOON_DB_PATH)?;
 
     let mut stmt = db.prepare("SELECT * FROM account WHERE id = ?1")?;
-    let mut rows = stmt.query_map([&acct_id], |row| {
+    let mut rows = stmt.query_map([&account_id], |row| {
         Ok(Account {
             id: row.get(0)?,
             network: row.get(1)?,
@@ -81,14 +84,14 @@ async fn main() -> cmd::Result<()> {
             descriptor: row.get(3)?,
         })
     })?;
-    let acct = match rows.next() {
+    let account = match rows.next() {
         Some(acct) => acct?,
         None => {
-            bail!("no account found for that acct id");
+            bail!("no account exists for account id {account_id}");
         }
     };
 
-    let desc_str = &acct.descriptor;
+    let desc_str = &account.descriptor;
     let secp = secp256k1::Secp256k1::new();
     let desc = Descriptor::parse_descriptor(&secp, desc_str)?.0;
     let mut desc_iter = desc.into_single_descriptors()?.into_iter();
@@ -97,15 +100,15 @@ async fn main() -> cmd::Result<()> {
     let did = desc.descriptor_id().to_string();
     let quorum_fp = &did[..8];
 
-    let (network, rpc_port) = match acct.network.as_str() {
+    let (network, rpc_port) = match account.network.as_str() {
         "signet" => (Network::Signet, 38332),
         "bitcoin" => (Network::Bitcoin, 8332),
         _ => bail!("unsupported network"),
     };
 
     // Load wallet for the intended quorum
-    // TODO: the path to the wallet should match the account id of the quorum we're loading
-    let mut conn = rusqlite::Connection::open(BDK_DB_PATH)?;
+    let bdk_db_path = format!("{}-{}-{}.db", BDK_DB_PREFIX, account.id, account.nick);
+    let mut conn = rusqlite::Connection::open(bdk_db_path)?;
     let mut tx = conn.transaction()?;
     let changeset = BdkChangeSet::initialize(&mut tx)?;
     tx.commit()?;
@@ -175,7 +178,7 @@ async fn main() -> cmd::Result<()> {
     let mut coordinator = {
         // Get friends from loon db
         let mut stmt = db.prepare("SELECT * FROM friend WHERE account_id = ?1")?;
-        let friends = stmt.query_map([acct.id], |row| {
+        let friends = stmt.query_map([account.id], |row| {
             Ok(loon::Friend {
                 account_id: row.get(0)?,
                 quorum_id: row.get(1)?,

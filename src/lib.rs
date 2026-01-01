@@ -17,10 +17,10 @@ pub use {
     filter_iter::{self, simplerpc},
 };
 
-/// Path to BDK wallet database.
-pub const BDK_DB_PATH: &str = "./wallet.db";
+/// BDK wallet database prefix name.
+pub const BDK_DB_PREFIX: &str = "wallet";
 /// Path to Loon database.
-pub const DB_PATH: &str = "./loon.db";
+pub const LOON_DB_PATH: &str = "loon.db";
 /// Human-readable part of a loon call
 pub const HRP: &str = "loon1";
 
