@@ -38,7 +38,7 @@ impl BdkChangeSet {
         }
     }
 
-    /// Persist `self` to SQLite
+    /// Persist `self` to sqlite.
     pub fn persist(&self, tx: &mut rusqlite::Transaction) -> Result<(), rusqlite::Error> {
         self.chain.persist_to_sqlite(tx)?;
         self.tx_graph.persist_to_sqlite(tx)?;
@@ -97,8 +97,8 @@ impl From<(keychain_txout::ChangeSet, tx_graph::ChangeSet<ConfirmationBlockTime>
         ),
     ) -> Self {
         Self {
-            indexer,
             tx_graph,
+            indexer,
             ..Default::default()
         }
     }

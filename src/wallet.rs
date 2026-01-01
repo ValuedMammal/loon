@@ -224,7 +224,7 @@ impl BdkWallet {
                 height,
                 hash: block.block_hash(),
             },
-            confirmation_time: block.header.time as u64,
+            confirmation_time: u64::from(block.header.time),
         };
 
         for tx in &block.txdata {
@@ -366,7 +366,7 @@ impl BdkWallet {
     /// Create PSBT.
     pub fn create_psbt(
         &mut self,
-        address: Address,
+        address: &Address,
         amount: Amount,
         feerate: FeeRate,
         sweep: bool,
@@ -389,7 +389,7 @@ impl BdkWallet {
 
         let mut can_select: Vec<Input> = self
             .list_unspent()
-            .flat_map(|txo| self.plan_input(txo, &assets))
+            .filter_map(|txo| self.plan_input(txo, &assets))
             .collect();
 
         can_select.shuffle(&mut rng);
@@ -460,7 +460,7 @@ impl BdkWallet {
     }
 }
 
-/// Create TxStatus from the given chain position (if confirmed).
+/// Create `TxStatus` from the given chain position (if confirmed).
 fn status_from_position(pos: ChainPosition<ConfirmationBlockTime>) -> Option<TxStatus> {
     if let ChainPosition::Confirmed { anchor, .. } = pos {
         let conf_height = anchor.confirmation_height_upper_bound();

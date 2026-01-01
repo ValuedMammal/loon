@@ -35,7 +35,7 @@ pub async fn push(coordinator: &Coordinator, cmd: CallSubCmd) -> Result<()> {
             let Recipient { id, alias } = recipient;
             if let (None, None) = (id, alias.as_ref()) {
                 bail!("no recipient found");
-            };
+            }
 
             let p = if let Some(id) = id {
                 coordinator

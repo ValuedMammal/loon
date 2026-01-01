@@ -227,7 +227,7 @@ async fn main() -> cmd::Result<()> {
             }
         }
         Cmd::Hash => {
-            println!("{}", coordinator.rpc_client().get_best_block_hash()?)
+            println!("{}", coordinator.rpc_client().get_best_block_hash()?);
         }
         Cmd::Generate(..) => unreachable!("handled above"),
         Cmd::Wallet(subcmd) => cmd::wallet::execute(&mut coordinator, subcmd).await?,
