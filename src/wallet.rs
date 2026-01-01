@@ -59,8 +59,11 @@ impl fmt::Display for Keychain {
 /// Structures for updating the wallet
 #[derive(Debug, Clone, Default)]
 pub struct Update {
+    /// Tx update
     pub tx_update: TxUpdate<ConfirmationBlockTime>,
+    /// Checkpoint
     pub cp: Option<CheckPoint>,
+    /// Last active keychain indices.
     pub last_active_indices: BTreeMap<Keychain, u32>,
 }
 
